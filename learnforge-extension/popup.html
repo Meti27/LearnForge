@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LearnForge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0c0818;
+      --surface: #150f2a;
+      --surface2: #1e1640;
+      --border: #2a1f52;
+      --border-hi: #3d2e7a;
+      --accent: #8b5cf6;
+      --accent-light: #a78bfa;
+      --accent2: #c084fc;
+      --accent-glow: rgba(139, 92, 246, 0.35);
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #f43f5e;
+      --text: #ede9fe;
+      --text-soft: #c4b5fd;
+      --muted: #6d5fa0;
+      --muted2: #9277cc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 380px;
+      min-height: 520px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      overflow-x: hidden;
+    }
+
+    /* Subtle noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.4;
+    }
+
+    /* ── HEADER ───────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(160deg, #160d30 0%, #0e0820 60%, #120a24 100%);
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--accent) 40%, var(--accent2) 60%, transparent 100%);
+      opacity: 0.6;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 18px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+
+    .logo-titles { display: flex; flex-direction: column; gap: 1px; }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #ddd6fe, #e879f9);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+
+    .logo-sub {
+      color: var(--muted2);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+      margin-top: 2px;
+    }
+
+    /* ── SHARED SECTION ───────────────────────────────────── */
+    .section {
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-label {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+
+    /* ── AUTH SECTION ─────────────────────────────────────── */
+    .btn-signin {
+      width: 100%;
+      background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(192,132,252,0.08));
+      border: 1px solid var(--border-hi);
+      border-radius: 8px;
+      padding: 9px 14px;
+      color: var(--accent-light);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+
+    .btn-signin:hover {
+      background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(192,132,252,0.15));
+      border-color: var(--accent);
+      box-shadow: 0 0 12px rgba(139,92,246,0.2);
+    }
+
+    .auth-note {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .auth-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .auth-avatar {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .auth-details { flex: 1; min-width: 0; }
+    .auth-email { font-size: 11px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .sync-status { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted2); margin-top: 2px; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.3s; }
+    .sync-dot.synced  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .sync-dot.pending { background: var(--gold); }
+    .sync-dot.offline { background: var(--red); }
+
+    .btn-signout {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-signout:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── API KEY ──────────────────────────────────────────── */
+    .input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .api-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .api-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+    }
+
+    .api-input::placeholder { color: var(--muted); }
+
+    .btn-save {
+      background: var(--surface2);
+      border: 1px solid var(--border-hi);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--accent-light);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-save:hover {
+      border-color: var(--accent);
+      background: rgba(139,92,246,0.15);
+    }
+
+    .key-status {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .key-status.saved { color: var(--green); }
+    .key-status.missing { color: var(--gold); }
+
+    /* ── SITE CHIPS ───────────────────────────────────────── */
+    .sites-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .site-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted2);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .site-chip:hover {
+      border-color: var(--border-hi);
+      color: var(--text);
+      background: var(--surface2);
+    }
+
+    .site-chip.active {
+      border-color: var(--accent);
+      background: rgba(139,92,246,0.12);
+      color: var(--text);
+      box-shadow: 0 0 0 1px rgba(139,92,246,0.2), 0 2px 8px rgba(139,92,246,0.1);
+    }
+
+    .site-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .site-chip.active .site-dot {
+      background: var(--accent-light);
+      box-shadow: 0 0 5px var(--accent-light);
+    }
+
+    .custom-site-row {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .custom-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .custom-input:focus { border-color: var(--accent); }
+    .custom-input::placeholder { color: var(--muted); }
+
+    .btn-add {
+      background: rgba(139,92,246,0.15);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--accent-light);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-add:hover { background: rgba(139,92,246,0.28); }
+
+    /* ── DECK INPUT ───────────────────────────────────────── */
+    .deck-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .deck-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+    }
+
+    /* ── ACTIVITY FEED ────────────────────────────────────── */
+    .activity-feed {
+      background: #090614;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 72px;
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .feed-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .feed-indicator {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .feed-title {
+      color: var(--muted2);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .log-line { display: flex; gap: 7px; align-items: flex-start; }
+
+    .log-prefix { color: var(--accent); flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
+    .log-prefix.ok   { color: var(--green); }
+    .log-prefix.err  { color: var(--red); }
+    .log-prefix.warn { color: var(--gold); }
+
+    .log-text { color: var(--text-soft); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; }
+
+    .cursor {
+      display: inline-block;
+      width: 6px; height: 12px;
+      background: var(--accent-light);
+      animation: blink 1.1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+      border-radius: 1px;
+    }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* ── PROGRESS BAR ─────────────────────────────────────── */
+    .progress-wrap {
+      height: 3px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar.indeterminate {
+      width: 35%;
+      animation: slide 1.3s ease-in-out infinite;
+    }
+
+    @keyframes slide {
+      0%   { transform: translateX(-250%); }
+      100% { transform: translateX(400%); }
+    }
+
+    /* ── ANKI STATUS ──────────────────────────────────────── */
+    .anki-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 7px;
+    }
+
+    .anki-status.ok   { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.22); color: var(--green); }
+    .anki-status.err  { background: rgba(244,63,94,0.08);  border: 1px solid rgba(244,63,94,0.22);  color: var(--red); }
+    .anki-status.warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.22); color: var(--gold); }
+
+    /* ── RESULTS GRID ─────────────────────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .result-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 6px;
+      text-align: center;
+    }
+
+    .result-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-light), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+
+    .result-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+    }
+
+    /* ── MAIN BUTTON ──────────────────────────────────────── */
+    .btn-main {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-main::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent 60%);
+    }
+
+    .btn-main.idle {
+      background: linear-gradient(135deg, #7c3aed, #9333ea, #7c3aed);
+      background-size: 200% 100%;
+      color: #fff;
+      box-shadow: 0 4px 22px rgba(124,58,237,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    .btn-main.idle:hover {
+      box-shadow: 0 6px 30px rgba(124,58,237,0.65), inset 0 1px 0 rgba(255,255,255,0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn-main.running {
+      background: linear-gradient(135deg, #1e1040, #130d30);
+      color: var(--muted2);
+      cursor: not-allowed;
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+
+    .btn-main.done {
+      background: linear-gradient(135deg, #064e3b, #022c22);
+      color: var(--green);
+      border: 1px solid rgba(16,185,129,0.3);
+      box-shadow: 0 4px 20px rgba(16,185,129,0.18);
+    }
+
+    .btn-main.error {
+      background: linear-gradient(135deg, #4c0519, #2a0010);
+      color: var(--red);
+      border: 1px solid rgba(244,63,94,0.3);
+    }
+
+    /* ── DASHBOARD BUTTON ─────────────────────────────────── */
+    .btn-dashboard {
+      width: 100%;
+      margin-top: 8px;
+      padding: 11px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted2);
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+
+    .btn-dashboard:hover {
+      border-color: var(--border-hi);
+      color: var(--accent-light);
+      background: rgba(139,92,246,0.08);
+    }
+
+    /* ── QUIZ ─────────────────────────────────────────────── */
+    .quiz-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 9px 0 4px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      user-select: none;
+      transition: color 0.15s;
+    }
+
+    .quiz-toggle:hover { color: var(--text-soft); }
+
+    .quiz-area { display: none; margin-top: 8px; }
+    .quiz-area.visible { display: block; }
+
+    .quiz-q {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 7px;
+    }
+
+    .q-text {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .q-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      padding: 5px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 10.5px;
+      color: var(--muted2);
+      transition: all 0.15s;
+    }
+
+    .q-option:hover { background: rgba(139,92,246,0.1); color: var(--text); }
+    .q-option.correct { background: rgba(16,185,129,0.1); color: var(--green); }
+    .q-option.wrong   { background: rgba(244,63,94,0.1);  color: var(--red); }
+
+    .q-letter {
+      width: 17px; height: 17px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      flex-shrink: 0;
+      font-family: 'Syne', sans-serif;
+    }
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    .footer-note {
+      padding: 9px 16px 11px;
+      color: var(--muted);
+      font-size: 9.5px;
+      font-weight: 500;
+      text-align: center;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .footer-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--border-hi);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ── HEADER ────────────────────────────────────────────── -->
+  <div class="header">
+    <div class="logo-row">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-titles">
+        <div class="logo-text">LearnForge</div>
+        <div class="logo-sub">Turn any page into a study session</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACCOUNT ────────────────────────────────────────────── -->
+  <div class="section" id="authSection">
+    <div class="section-label">Your Account</div>
+
+    <div id="authLoggedOut">
+      <button class="btn-signin" id="signInBtn">
+        <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#8b5cf6"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#a78bfa"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#c084fc"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#ddd6fe"/></svg>
+        Continue with Google
+      </button>
+      <div class="auth-note">Sync your progress across devices &amp; unlock the Study Hub</div>
+    </div>
+
+    <div id="authLoggedIn" class="hidden">
+      <div class="auth-user-row">
+        <div class="auth-avatar" id="authAvatar">?</div>
+        <div class="auth-details">
+          <div class="auth-email" id="authEmail"></div>
+          <div class="sync-status">
+            <div class="sync-dot" id="syncDot"></div>
+            <span id="syncLabel">Synced</span>
+          </div>
+        </div>
+        <button class="btn-signout" id="signOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI ENGINE ──────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">AI Engine</div>
+    <div class="input-row">
+      <input type="password" class="api-input" id="groqApiKey" placeholder="gsk_···  Groq API key" autocomplete="off" />
+      <button class="btn-save" id="saveApiKey">Save</button>
+    </div>
+    <div class="key-status missing" id="keyStatus">Add your key to unlock AI generation</div>
+  </div>
+
+  <!-- ── LEARNING SOURCE ────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Learning Source</div>
+    <div class="sites-grid" id="sitesGrid">
+      <!-- dynamically populated -->
+    </div>
+    <div class="custom-site-row">
+      <input type="text" class="custom-input" id="customSiteInput" placeholder="Add a domain, e.g. udemy.com" />
+      <button class="btn-add" id="addSiteBtn">+ Add</button>
+    </div>
+  </div>
+
+  <!-- ── STUDY DECK ──────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Study Deck</div>
+    <input type="text" class="deck-input" id="deckName" value="LearnForge" placeholder="Name your Anki deck" />
+  </div>
+
+  <!-- ── ACTIVITY FEED ──────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-label">Activity</div>
+    <div class="activity-feed">
+      <div class="feed-header">
+        <div class="feed-indicator"></div>
+        <div class="feed-title">Live Output</div>
+      </div>
+      <div id="logArea">
+        <div class="log-line">
+          <span class="log-prefix">›</span>
+          <span class="log-text">All set — choose a source and hit Generate.<span class="cursor"></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div id="ankiStatus" class="hidden"></div>
+
+    <div class="results-grid hidden" id="resultsGrid">
+      <div class="result-card">
+        <div class="result-num" id="rQuiz">0</div>
+        <div class="result-label">Questions</div>
+      </div>
+      <div class="result-card">
+        <div class="result-num" id="rCards">0</div>
+        <div class="result-label">Flashcards</div>
+      </div>
+      <div class="result-card">
+        <div class="result-num" id="rAnki">0</div>
+        <div class="result-label">Sent to Anki</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACTIONS ────────────────────────────────────────────── -->
+  <div class="section" style="border-bottom: none;">
+    <button class="btn-main idle" id="mainBtn">⚡ Generate Flashcards</button>
+    <button class="btn-dashboard" id="openDashboard">
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2zm0 5a1 1 0 011-1h2a1 1 0 011 1v1a1 1 0 01-1 1h-2a1 1 0 01-1-1v-1z"/></svg>
+      Open Study Hub
+    </button>
+
+    <div class="quiz-toggle hidden" id="quizToggle">
+      <span>Quick Quiz Preview</span>
+      <span id="quizArrow">▾</span>
+    </div>
+    <div class="quiz-area" id="quizArea"></div>
+  </div>
+
+  <div class="footer-note">
+    <div class="footer-dot"></div>
+    Anki must be running with AnkiConnect enabled
+    <div class="footer-dot"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

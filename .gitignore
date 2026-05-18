@@ -1,0 +1,21 @@
+# Screenshots from dev sessions
+*.png
+*.jpg
+*.jpeg
+
+# Node
+node_modules/
+
+# Next.js build output
+learnforge-web/.next/
+learnforge-web/out/
+
+# Env files (never commit)
+.env
+.env.local
+.env*.local
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
