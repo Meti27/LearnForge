@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: ⚡
+    - generic [ref=e5]:
+      - generic [ref=e6]: LearnForge
+      - generic [ref=e7]: Turn any page into a study session
+  - generic [ref=e8]:
+    - generic [ref=e9]: Your Account
+    - generic [ref=e10]:
+      - button "Continue with Google" [ref=e11] [cursor=pointer]:
+        - img [ref=e12]
+        - text: Continue with Google
+      - generic [ref=e17]: Sync your progress across devices & unlock the Study Hub
+  - generic [ref=e18]:
+    - generic [ref=e19]: AI Engine
+    - generic [ref=e20]:
+      - textbox "gsk_··· Groq API key" [ref=e21]:
+        - /placeholder: gsk_···  Groq API key
+      - button "Save" [ref=e22] [cursor=pointer]
+    - generic [ref=e23]: Add your key to unlock AI generation
+  - generic [ref=e24]:
+    - generic [ref=e25]: Learning Source
+    - generic [ref=e26]:
+      - textbox "Add a domain, e.g. udemy.com" [ref=e27]
+      - button "+ Add" [ref=e28] [cursor=pointer]
+  - generic [ref=e29]:
+    - generic [ref=e30]: Study Deck
+    - textbox "Name your Anki deck" [ref=e31]: LearnForge
+  - generic [ref=e32]:
+    - generic [ref=e33]: Activity
+    - generic [ref=e34]:
+      - generic [ref=e37]: Live Output
+      - generic [ref=e39]:
+        - generic [ref=e40]: ›
+        - generic [ref=e41]: All set — choose a source and hit Generate.
+  - generic [ref=e44]:
+    - button "⚡ Generate Flashcards" [ref=e45] [cursor=pointer]
+    - button "Open Study Hub" [ref=e46] [cursor=pointer]:
+      - img [ref=e47]
+      - text: Open Study Hub
+  - generic [ref=e49]: Anki must be running with AnkiConnect enabled

@@ -1,0 +1,3 @@
+[      31ms] TypeError: Cannot read properties of undefined (reading 'onMessage')
+    at http://localhost:7890/popup.js:147:16
+[      36ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://localhost:7890/popup.html:0

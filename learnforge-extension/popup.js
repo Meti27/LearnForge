@@ -134,7 +134,7 @@ function setSyncStatus(status) {
 }
 
 $signInBtn.addEventListener("click", () => {
-  chrome.tabs.create({ url: "https://learnforge.vercel.app/login?source=extension" });
+  chrome.tabs.create({ url: "https://learn-forge-rho.vercel.app/login?source=extension" });
 });
 
 $signOutBtn.addEventListener("click", async () => {

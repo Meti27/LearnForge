@@ -1,0 +1,36 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: ⚡
+      - generic [ref=e6]: LearnForge
+    - generic [ref=e7]: AI Flashcard Generator · v1.0
+  - generic [ref=e8]:
+    - generic [ref=e9]: Cloud Sync
+    - generic [ref=e10]:
+      - button "Sign in with Google" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]: Sign in to sync sessions across devices & access the web dashboard
+  - generic [ref=e13]:
+    - generic [ref=e14]: Groq API Key
+    - generic [ref=e15]:
+      - textbox "gsk_..." [ref=e16]
+      - button "Save" [ref=e17] [cursor=pointer]
+    - generic [ref=e18]: No API key saved
+  - generic [ref=e19]:
+    - generic [ref=e20]: Active Platform
+    - generic [ref=e21]:
+      - 'textbox "Add domain: e.g. udemy.com" [ref=e22]'
+      - button "+Add" [ref=e23] [cursor=pointer]
+  - generic [ref=e24]:
+    - generic [ref=e25]: Anki Deck Name
+    - textbox "Deck name in Anki" [ref=e26]: LearnForge
+  - generic [ref=e27]:
+    - generic [ref=e28]: Console
+    - generic [ref=e29]:
+      - generic [ref=e34]: learnforge.log
+      - generic [ref=e36]:
+        - generic [ref=e37]: $
+        - generic [ref=e38]: Ready. Click Enable to begin.
+  - generic [ref=e41]:
+    - button "⚡ Enable" [ref=e42] [cursor=pointer]
+    - button "📊 Open Study Dashboard" [ref=e43] [cursor=pointer]
+  - generic [ref=e44]: Make sure AnkiConnect is installed & Anki is open

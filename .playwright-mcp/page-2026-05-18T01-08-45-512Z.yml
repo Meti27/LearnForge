@@ -1,0 +1,13 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]: ⚡
+    - heading "Sign in to LearnForge" [level=1] [ref=e5]
+    - paragraph [ref=e6]: Access your study dashboard and track your progress.
+    - button "Continue with Google" [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+      - text: Continue with Google
+    - paragraph [ref=e13]:
+      - text: By signing in you agree to our
+      - link "Privacy Policy" [ref=e14] [cursor=pointer]:
+        - /url: /privacy
+      - text: .

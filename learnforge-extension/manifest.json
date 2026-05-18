@@ -29,7 +29,7 @@
   ],
   "externally_connectable": {
     "matches": [
-      "https://learnforge.vercel.app/*"
+      "https://learn-forge-rho.vercel.app/*"
     ]
   },
   "action": {

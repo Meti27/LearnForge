@@ -320,7 +320,7 @@ async function handleAuthToken(msg) {
     authUser:  { id: user.id, email: user.email, name: user.user_metadata?.full_name || "" },
   });
   // Close the extension-login tab automatically
-  const tabs = await chrome.tabs.query({ url: "https://learnforge.vercel.app/auth/extension-login*" });
+  const tabs = await chrome.tabs.query({ url: "https://learn-forge-rho.vercel.app/auth/extension-login*" });
   for (const tab of tabs) chrome.tabs.remove(tab.id);
   // Sync any sessions that were generated before the user logged in
   syncPendingSessions().catch(() => {});

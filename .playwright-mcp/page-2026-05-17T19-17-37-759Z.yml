@@ -1,0 +1,37 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: ⚡
+      - generic [ref=e6]:
+        - generic [ref=e7]: LearnForge
+        - generic [ref=e8]: STUDY DASHBOARD
+    - generic [ref=e9]:
+      - button "Overview" [ref=e10] [cursor=pointer]
+      - button "Sessions" [ref=e11] [cursor=pointer]
+      - button "Study" [ref=e12] [cursor=pointer]
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: Total Sessions
+        - generic [ref=e17]: "0"
+        - generic [ref=e18]: Pages studied
+      - generic [ref=e19]:
+        - generic [ref=e20]: Flashcards
+        - generic [ref=e21]: "0"
+        - generic [ref=e22]: Generated
+      - generic [ref=e23]:
+        - generic [ref=e24]: Quiz Accuracy
+        - generic [ref=e25]: —
+        - generic [ref=e26]: Across all quizzes
+      - generic [ref=e27]:
+        - generic [ref=e28]: Current Streak
+        - generic [ref=e29]: "0"
+        - generic [ref=e30]: 🔥 Days in a row
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - text: Activity
+        - generic [ref=e33]: Last 12 months
+      - generic [ref=e34]:
+        - generic [ref=e35]: Less
+        - generic [ref=e41]: More
+    - generic [ref=e42]: Recent Activity

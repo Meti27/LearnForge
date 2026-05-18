@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright",
+      "Bash(ls *)",
+      "Bash(npx create-next-app@14 *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(curl *)",
+      "Bash(npm run *)",
+      "Read(//home/meti/.claude/**)",
+      "Read(//home/meti/.config/claude/**)",
+      "Bash(python3 -m json.tool)",
+      "Bash(npx @playwright/mcp@latest --version)",
+      "mcp__playwright__browser_navigate",
+      "Bash(python3 -m http.server 7890)",
+      "Bash(echo \"PID: $!\")",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_close",
+      "Bash(pkill -f \"ms-playwright\")",
+      "Bash(kill -9 72432)",
+      "Read(//home/meti/.cache/ms-playwright/**)",
+      "Bash(rm -rf /home/meti/.cache/ms-playwright/mcp-chrome-0bfbc37)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(rm -rf .next)",
+      "Bash(echo \"Started PID: $!\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(rm -rf learnforge-web/.git)",
+      "Bash(git rm *)"
+    ]
+  }
+}
