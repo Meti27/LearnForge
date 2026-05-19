@@ -1,7 +1,7 @@
 import FAQAccordion from "./components/FAQAccordion";
 import ThemeToggle from "./components/ThemeToggle";
 
-const CWS_URL = "#setup"; // update to Chrome Web Store URL after publishing
+const INSTALL_URL = "/install";
 
 export default function LandingPage() {
   return (
@@ -23,7 +23,7 @@ export default function LandingPage() {
             <div className="nav-actions">
               <ThemeToggle />
               <a href="/login" className="btn btn-ghost">Sign in</a>
-              <a href={CWS_URL} className="btn btn-primary">Install free</a>
+              <a href={INSTALL_URL} className="btn btn-primary">Install free</a>
             </div>
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function LandingPage() {
             questions and flashcards from the page in seconds — and pushes them straight to Anki.
           </p>
           <div className="hero-ctas">
-            <a href={CWS_URL} className="btn btn-primary btn-lg">
+            <a href={INSTALL_URL} className="btn btn-primary btn-lg">
               ⬇ Install for Chrome / Brave
             </a>
             <a href="/login" className="btn btn-ghost btn-lg">
@@ -238,7 +238,7 @@ export default function LandingPage() {
           <h2>Everything you read, remembered.</h2>
           <p>Generate flashcards from any page. Revisit sessions anywhere. Build knowledge that actually sticks.</p>
           <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-            <a href={CWS_URL} className="btn btn-primary btn-lg" style={{ fontSize: "16px", padding: "14px 28px" }}>
+            <a href={INSTALL_URL} className="btn btn-primary btn-lg" style={{ fontSize: "16px", padding: "14px 28px" }}>
               ⬇ Install LearnForge
             </a>
             <a href="/login" className="btn btn-ghost btn-lg" style={{ borderColor: "rgba(255,255,255,.25)", color: "rgba(255,255,255,.8)" }}>

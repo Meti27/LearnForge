@@ -262,6 +262,25 @@ code { background: var(--gray-1); border: 1px solid var(--border); border-radius
 .cta-section h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; }
 .cta-section p { font-size: 18px; color: rgba(196,181,253,.7); max-width: 480px; margin: 0 auto 40px; line-height: 1.7; }
 
+/* ── INSTALL PAGE ── */
+.install-step { padding: 40px 0; }
+.install-step-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.install-step-header h2 { font-size: 22px; font-weight: 700; }
+.install-step-body p { font-size: 15px; color: var(--gray-6); margin-bottom: 16px; }
+.install-list { padding-left: 20px; display: flex; flex-direction: column; gap: 12px; }
+.install-list li { font-size: 15px; color: var(--gray-9); line-height: 1.6; }
+.install-divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+.install-code {
+  background: var(--gray-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; font-size: 13px; font-family: "JetBrains Mono", monospace;
+  margin-top: 10px; overflow-x: auto; color: var(--gray-9); line-height: 1.6;
+}
+.install-faq-list { display: flex; flex-direction: column; gap: 0; }
+.install-faq-item { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.install-faq-item:last-child { border-bottom: none; }
+.install-faq-q { font-size: 14px; font-weight: 600; margin-bottom: 6px; font-family: monospace; color: var(--accent); }
+.install-faq-a { font-size: 14px; color: var(--gray-6); line-height: 1.6; }
+
 /* ── FOOTER ── */
 footer { border-top: 1px solid var(--border); padding: 40px 0; }
 .footer-inner { display: flex; align-items: center; gap: 32px; flex-wrap: wrap; }
