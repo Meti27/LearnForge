@@ -171,16 +171,14 @@ chrome.runtime.onMessage.addListener((msg) => {
     document.getElementById("rAnki").textContent = ankiResult.added;
     $resultsGrid.className = "results-grid";
 
-    if (ankiResult.success) {
-      showAnkiStatus("ok", `✓ ${ankiResult.added} cards added to Anki deck "${deckName}"`);
-      log("Cards synced to Anki successfully.", "ok");
-      log("Review reminder scheduled for 24 hours.", "ok");
-    } else {
-      showAnkiStatus("err", `✗ ${ankiResult.error}`);
-      log(ankiResult.error, "err");
-      if (ankiResult.notRunning) {
-        showAnkiStatus("err", "Make sure Anki is open with AnkiConnect installed (port 8765)");
-      }
+    if (ankiResult.success && ankiResult.added > 0) {
+      showAnkiStatus("ok", `✓ ${ankiResult.added} cards exported to Anki deck "${deckName}"`);
+      log("Cards exported to Anki.", "ok");
+    } else if (ankiResult.notRunning) {
+      showAnkiStatus("info", "Anki not running — cards saved locally and in your Study Hub");
+      log("Anki not running (optional). Cards are saved and ready to review.", "info");
+    } else if (!ankiResult.success) {
+      showAnkiStatus("info", "Anki export skipped — cards saved locally and in your Study Hub");
     }
 
     renderQuiz(aiResult.quiz);

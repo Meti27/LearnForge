@@ -1,23 +1,41 @@
 // dashboard.js — LearnForge Study Dashboard
 
 let allSessions = [];
+let srsData = {};       // { "sessionId:cardIdx": { nextReview, interval, reps } }
+let srsSettings = {};   // user-customizable intervals in ms
 let currentQuiz = null;
 let currentReview = null;
 
+// ── SRS intervals (ms) ────────────────────────────────────────────────────────
+const DEFAULT_SRS = {
+  again: 60 * 1000,               // 1 minute
+  hard:  10 * 60 * 1000,          // 10 minutes
+  good:  24 * 60 * 60 * 1000,     // 1 day
+  easy:  3 * 24 * 60 * 60 * 1000, // 3 days
+};
+
+function getInterval(rating) {
+  return srsSettings[rating] ?? DEFAULT_SRS[rating];
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  const data = await chrome.storage.local.get(["sessions"]);
-  allSessions = data.sessions || [];
+  const data = await chrome.storage.local.get(["sessions", "srsData", "srsSettings"]);
+  allSessions  = data.sessions    || [];
+  srsData      = data.srsData     || {};
+  srsSettings  = data.srsSettings || {};
   renderAll();
   setupTabs();
   setupSearch();
   setupModals();
   setupExports();
+  setupSettings();
 }
 
 function renderAll() {
   renderStats();
   renderHeatmap();
+  renderDue();
   renderRecent();
   renderAllSessions();
   renderStudyList();
@@ -38,9 +56,8 @@ function setupTabs() {
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats() {
   const totalCards = allSessions.reduce((s, x) => s + (x.flashcards?.length || 0), 0);
-  const totalAnki = allSessions.reduce((s, x) => s + (x.addedToAnki || 0), 0);
+  const dueCards   = getDueCards().length;
 
-  // Quiz accuracy
   const completedQuizzes = allSessions.filter(s => s.quizResults?.completed);
   let accuracy = "—";
   if (completedQuizzes.length > 0) {
@@ -49,27 +66,21 @@ function renderStats() {
     accuracy = totalAsked > 0 ? Math.round((totalRight / totalAsked) * 100) + "%" : "—";
   }
 
-  // Streak
-  const streak = calculateStreak();
-
   document.getElementById("statSessions").textContent = allSessions.length;
   document.getElementById("statCards").textContent = totalCards;
-  document.getElementById("statCardsSub").textContent = `${totalAnki} pushed to Anki`;
+  document.getElementById("statCardsSub").textContent = dueCards > 0 ? `${dueCards} due for review` : "All caught up ✓";
   document.getElementById("statAccuracy").textContent = accuracy;
   document.getElementById("statAccuracySub").textContent = `${completedQuizzes.length} quizzes taken`;
-  document.getElementById("statStreak").textContent = streak;
+  document.getElementById("statStreak").textContent = calculateStreak();
 
   document.getElementById("totalQuizQ").textContent = `${allSessions.reduce((s, x) => s + (x.quiz?.length || 0), 0)} questions available`;
-  document.getElementById("totalReviewC").textContent = `${totalCards} cards in pool`;
+  document.getElementById("totalReviewC").textContent = `${dueCards} cards due · ${totalCards} total`;
 }
 
 function calculateStreak() {
   if (allSessions.length === 0) return 0;
   const days = new Set();
-  allSessions.forEach(s => {
-    const d = new Date(s.timestamp);
-    days.add(d.toISOString().slice(0, 10));
-  });
+  allSessions.forEach(s => days.add(new Date(s.timestamp).toISOString().slice(0, 10)));
   let streak = 0;
   let cursor = new Date();
   while (true) {
@@ -78,12 +89,90 @@ function calculateStreak() {
       streak++;
       cursor.setDate(cursor.getDate() - 1);
     } else if (streak === 0 && cursor.toDateString() === new Date().toDateString()) {
-      // No activity today — check yesterday
       cursor.setDate(cursor.getDate() - 1);
     } else break;
     if (streak > 365) break;
   }
   return streak;
+}
+
+// ── SRS helpers ───────────────────────────────────────────────────────────────
+function getDueCards() {
+  const now = Date.now();
+  const due = [];
+  allSessions.forEach(session => {
+    (session.flashcards || []).forEach((card, cardIdx) => {
+      const key = `${session.id}:${cardIdx}`;
+      const srs = srsData[key];
+      if (!srs || srs.nextReview <= now) {
+        due.push({ session, cardIdx, card, srs, key });
+      }
+    });
+  });
+  // Sort: never-reviewed first, then by nextReview ascending
+  return due.sort((a, b) => {
+    if (!a.srs && !b.srs) return 0;
+    if (!a.srs) return -1;
+    if (!b.srs) return 1;
+    return a.srs.nextReview - b.srs.nextReview;
+  });
+}
+
+function formatNextReview(srs) {
+  if (!srs) return "New";
+  const diff = srs.nextReview - Date.now();
+  if (diff <= 0) return "Due now";
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `in ${mins}m`;
+  const hrs = Math.round(diff / 3600000);
+  if (hrs < 24) return `in ${hrs}h`;
+  return `in ${Math.round(diff / 86400000)}d`;
+}
+
+// ── Due for review section ────────────────────────────────────────────────────
+function renderDue() {
+  const container = document.getElementById("dueSection");
+  if (!container) return;
+  const due = getDueCards();
+
+  if (due.length === 0) {
+    container.innerHTML = `
+      <div class="due-header">
+        <span class="due-title">🟢 All caught up</span>
+        <span class="due-count">No cards due</span>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="due-header">
+      <span class="due-title">⚡ Due for Review</span>
+      <span class="due-count">${due.length} card${due.length !== 1 ? "s" : ""}</span>
+    </div>
+    <div class="due-preview">
+      ${due.slice(0, 3).map(d => `
+        <div class="due-card-chip">
+          <span class="due-chip-text">${escapeHtml(d.card.front.slice(0, 60))}${d.card.front.length > 60 ? "…" : ""}</span>
+          <span class="due-chip-tag">${escapeHtml(d.session.domain)}</span>
+        </div>
+      `).join("")}
+      ${due.length > 3 ? `<div class="due-card-chip due-more">+${due.length - 3} more</div>` : ""}
+    </div>
+    <button class="btn-review-due" id="startDueReviewBtn">
+      Start Review (${due.length})
+    </button>
+  `;
+
+  document.getElementById("startDueReviewBtn")?.addEventListener("click", () => {
+    const dueNow = getDueCards();
+    if (dueNow.length === 0) return;
+    const fakeSession = {
+      id: "due-review",
+      title: `Due Review — ${dueNow.length} card${dueNow.length !== 1 ? "s" : ""}`,
+      flashcards: dueNow.map(d => ({ ...d.card, _from: d.session.title, _key: d.key })),
+    };
+    startReview(fakeSession);
+  });
 }
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
@@ -93,15 +182,12 @@ function renderHeatmap() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Build count map
   const counts = {};
   allSessions.forEach(s => {
-    const d = new Date(s.timestamp);
-    const key = d.toISOString().slice(0, 10);
+    const key = new Date(s.timestamp).toISOString().slice(0, 10);
     counts[key] = (counts[key] || 0) + 1;
   });
 
-  // 365 days = 53 weeks of 7 days
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - 365);
 
@@ -121,6 +207,7 @@ function renderHeatmap() {
     cell.title = `${key}: ${count} session${count !== 1 ? "s" : ""}`;
     grid.appendChild(cell);
   }
+
   const totalActiveDays = Object.keys(counts).length;
   document.getElementById("heatmapTotal").textContent = `${totalActiveDays} active days in last year`;
 }
@@ -182,6 +269,13 @@ function renderSessionCard(s, withDelete = false, studyMode = false) {
     ? `${Math.round((s.quizResults.correct / s.quizResults.total) * 100)}%`
     : null;
 
+  // Count due cards for this session
+  const now = Date.now();
+  const sessionDue = (s.flashcards || []).filter((_, i) => {
+    const srs = srsData[`${s.id}:${i}`];
+    return !srs || srs.nextReview <= now;
+  }).length;
+
   return `
     <div class="session-card" data-id="${s.id}">
       <div>
@@ -190,8 +284,8 @@ function renderSessionCard(s, withDelete = false, studyMode = false) {
           <div class="s-meta-item s-domain">🌐 ${escapeHtml(s.domain)}</div>
           <div class="s-meta-item">📅 ${dateStr} · ${timeStr}</div>
           <div class="s-meta-item">📝 ${s.quiz?.length || 0} Q · 🎴 ${s.flashcards?.length || 0} cards</div>
-          ${quizScore ? `<div class="s-meta-item" style="color: var(--green)">✓ Last score: ${quizScore}</div>` : ""}
-          ${s.addedToAnki ? `<div class="s-meta-item">→ Anki: ${s.addedToAnki}</div>` : ""}
+          ${sessionDue > 0 ? `<div class="s-meta-item" style="color: var(--amber)">⚡ ${sessionDue} due</div>` : `<div class="s-meta-item" style="color: var(--green)">✓ Caught up</div>`}
+          ${quizScore ? `<div class="s-meta-item" style="color: var(--green)">✓ Quiz: ${quizScore}</div>` : ""}
         </div>
       </div>
       <div class="s-actions">
@@ -229,6 +323,40 @@ function setupSearch() {
   input.addEventListener("input", () => renderAllSessions(input.value));
 }
 
+// ── Settings panel ────────────────────────────────────────────────────────────
+function setupSettings() {
+  const panel = document.getElementById("srsSettingsPanel");
+  if (!panel) return;
+
+  const fields = ["again", "hard", "good", "easy"];
+  fields.forEach(f => {
+    const el = document.getElementById(`srs_${f}`);
+    if (!el) return;
+    // Display current value in human-readable form
+    const ms = srsSettings[f] ?? DEFAULT_SRS[f];
+    el.value = msToInput(f, ms);
+    el.addEventListener("change", async () => {
+      srsSettings[f] = inputToMs(f, parseFloat(el.value) || defaultInputVal(f));
+      await chrome.storage.local.set({ srsSettings });
+    });
+  });
+}
+
+function msToInput(rating, ms) {
+  if (rating === "again" || rating === "hard") return Math.round(ms / 60000); // minutes
+  return Math.round(ms / 86400000); // days
+}
+
+function inputToMs(rating, val) {
+  if (rating === "again" || rating === "hard") return val * 60000;
+  return val * 86400000;
+}
+
+function defaultInputVal(rating) {
+  const defaults = { again: 1, hard: 10, good: 1, easy: 3 };
+  return defaults[rating];
+}
+
 // ── Quiz modal ────────────────────────────────────────────────────────────────
 function setupModals() {
   document.getElementById("quizClose").addEventListener("click", closeQuiz);
@@ -243,30 +371,35 @@ function setupModals() {
   document.getElementById("quizNext").addEventListener("click", quizNext);
   document.getElementById("quizPrev").addEventListener("click", quizPrev);
 
-  // Mixed quiz mode
   document.getElementById("studyAllQuizCard").addEventListener("click", () => {
     const allQuestions = allSessions.flatMap(s => (s.quiz || []).map(q => ({ ...q, _from: s.title })));
     if (allQuestions.length === 0) return alert("No quiz questions available yet.");
-    // Shuffle and take up to 20
     const shuffled = allQuestions.sort(() => Math.random() - 0.5).slice(0, 20);
     startQuiz({ id: "mixed", title: "Mixed Quiz — All Sessions", quiz: shuffled });
   });
 
-  // Review all
   document.getElementById("studyAllCardsCard").addEventListener("click", () => {
-    const allCards = allSessions.flatMap(s => (s.flashcards || []).map(c => ({ ...c, _from: s.title })));
-    if (allCards.length === 0) return alert("No flashcards available yet.");
-    const shuffled = allCards.sort(() => Math.random() - 0.5);
-    startReview({ id: "all-cards", title: "Review All Cards", flashcards: shuffled });
+    const due = getDueCards();
+    if (due.length > 0) {
+      // Prioritise due cards in "review all"
+      const fakeSession = {
+        id: "due-review",
+        title: `Due Review — ${due.length} card${due.length !== 1 ? "s" : ""}`,
+        flashcards: due.map(d => ({ ...d.card, _from: d.session.title, _key: d.key })),
+      };
+      startReview(fakeSession);
+    } else {
+      const allCards = allSessions.flatMap(s => (s.flashcards || []).map(c => ({ ...c, _from: s.title })));
+      if (allCards.length === 0) return alert("No flashcards available yet.");
+      startReview({ id: "all-cards", title: "Review All Cards", flashcards: allCards.sort(() => Math.random() - 0.5) });
+    }
   });
 
-  // Flashcard flip
   document.getElementById("flashcard").addEventListener("click", flipCard);
   document.querySelectorAll(".rating-btn").forEach(b => {
     b.addEventListener("click", () => rateCard(b.dataset.rating));
   });
 
-  // Keyboard shortcuts inside quiz
   document.addEventListener("keydown", (e) => {
     if (document.getElementById("quizModal").classList.contains("active")) {
       if (e.key === "Escape") closeQuiz();
@@ -292,12 +425,7 @@ function setupModals() {
 
 // ── Quiz logic ────────────────────────────────────────────────────────────────
 function startQuiz(session) {
-  currentQuiz = {
-    session,
-    idx: 0,
-    answers: new Array(session.quiz.length).fill(null),
-    completed: false,
-  };
+  currentQuiz = { session, idx: 0, answers: new Array(session.quiz.length).fill(null), completed: false };
   document.getElementById("quizTitle").textContent = session.title;
   document.getElementById("quizModal").classList.add("active");
   renderQuizQuestion();
@@ -337,8 +465,7 @@ function renderQuizQuestion() {
   document.querySelectorAll("#quizBody .q-opt").forEach(opt => {
     opt.addEventListener("click", () => {
       if (opt.classList.contains("locked")) return;
-      const i = parseInt(opt.dataset.idx);
-      currentQuiz.answers[currentQuiz.idx] = i;
+      currentQuiz.answers[currentQuiz.idx] = parseInt(opt.dataset.idx);
       renderQuizQuestion();
     });
   });
@@ -369,7 +496,6 @@ async function finishQuiz() {
   const total = session.quiz.length;
   const pct = Math.round((correct / total) * 100);
 
-  // Save results (only for real sessions, not mixed mode)
   if (session.id !== "mixed") {
     const idx = allSessions.findIndex(s => s.id === session.id);
     if (idx !== -1) {
@@ -380,7 +506,7 @@ async function finishQuiz() {
 
   document.getElementById("quizBody").innerHTML = `
     <div class="quiz-results">
-      <div class="score-circle" style="--pct: ${pct}%; background: conic-gradient(${pct >= 70 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)'} 0%, ${pct >= 70 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)'} ${pct}%, var(--border) ${pct}%, var(--border) 100%);">
+      <div class="score-circle" style="--pct: ${pct}%; background: conic-gradient(${pct >= 70 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)"} 0%, ${pct >= 70 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)"} ${pct}%, var(--border) ${pct}%, var(--border) 100%);">
         <div class="score-text">${pct}%</div>
       </div>
       <div style="margin-bottom: 8px; font-size: 18px; color: var(--text); font-family: 'Syne',sans-serif;">${correct} / ${total} correct</div>
@@ -400,14 +526,9 @@ function closeQuiz() {
   renderStats();
 }
 
-// ── Flashcard review ──────────────────────────────────────────────────────────
+// ── Flashcard review with SRS ─────────────────────────────────────────────────
 function startReview(session) {
-  currentReview = {
-    session,
-    idx: 0,
-    flipped: false,
-    ratings: [],
-  };
+  currentReview = { session, idx: 0, flipped: false, ratings: [] };
   document.getElementById("cardTitle").textContent = session.title;
   document.getElementById("cardModal").classList.add("active");
   renderCard();
@@ -416,16 +537,22 @@ function startReview(session) {
 function renderCard() {
   const { session, idx, flipped } = currentReview;
   const total = session.flashcards.length;
-  const card = session.flashcards[idx];
+  const card  = session.flashcards[idx];
 
   document.getElementById("cardCounter").textContent = `Card ${idx + 1} of ${total}`;
   document.getElementById("cardProgressFill").style.width = ((idx + 1) / total * 100) + "%";
 
-  const fc = document.getElementById("flashcard");
+  // Show next review time above rating buttons
+  const key = card._key || `${session.id}:${idx}`;
+  const srs  = srsData[key];
+  const nextEl = document.getElementById("cardNextReview");
+  if (nextEl) nextEl.textContent = srs ? `Last rated: ${formatNextReview(srs)}` : "New card";
+
+  const fc      = document.getElementById("flashcard");
   const sideLabel = document.getElementById("cardSide");
-  const content = document.getElementById("cardContent");
-  const hint = document.getElementById("cardHint");
-  const actions = document.getElementById("cardActions");
+  const content   = document.getElementById("cardContent");
+  const hint      = document.getElementById("cardHint");
+  const actions   = document.getElementById("cardActions");
 
   if (!flipped) {
     fc.classList.remove("flipped");
@@ -452,40 +579,47 @@ function flipCard() {
 
 async function rateCard(rating) {
   if (!currentReview) return;
-  currentReview.ratings.push({ idx: currentReview.idx, rating });
 
-  // Save ratings to session (for real session, not "all cards")
-  if (currentReview.session.id !== "all-cards") {
-    const idx = allSessions.findIndex(s => s.id === currentReview.session.id);
-    if (idx !== -1) {
-      allSessions[idx].cardsReviewed = allSessions[idx].cardsReviewed || [];
-      allSessions[idx].cardsReviewed.push({
-        cardIdx: currentReview.idx,
-        rating,
-        at: Date.now(),
-      });
+  const { session, idx } = currentReview;
+  const card = session.flashcards[idx];
+
+  // Determine SRS key — due-review sessions pass _key directly
+  const key = card._key || `${session.id}:${idx}`;
+  const interval = getInterval(rating);
+  const nextReview = Date.now() + interval;
+  const reps = (srsData[key]?.reps || 0) + 1;
+
+  srsData[key] = { nextReview, interval, reps };
+  await chrome.storage.local.set({ srsData });
+
+  currentReview.ratings.push({ idx, rating });
+
+  // Save cardsReviewed on real sessions (not virtual ones)
+  if (session.id !== "due-review" && session.id !== "all-cards") {
+    const si = allSessions.findIndex(s => s.id === session.id);
+    if (si !== -1) {
+      allSessions[si].cardsReviewed = allSessions[si].cardsReviewed || [];
+      allSessions[si].cardsReviewed.push({ cardIdx: idx, rating, at: Date.now() });
       await chrome.storage.local.set({ sessions: allSessions });
     }
   }
 
-  if (currentReview.idx < currentReview.session.flashcards.length - 1) {
+  if (idx < session.flashcards.length - 1) {
     currentReview.idx++;
     currentReview.flipped = false;
     renderCard();
   } else {
-    // Done
     const total = currentReview.ratings.length;
-    const easy = currentReview.ratings.filter(r => r.rating === "easy").length;
-    const good = currentReview.ratings.filter(r => r.rating === "good").length;
+    const easy  = currentReview.ratings.filter(r => r.rating === "easy").length;
+    const good  = currentReview.ratings.filter(r => r.rating === "good").length;
+    const hard  = currentReview.ratings.filter(r => r.rating === "hard").length;
+    const again = currentReview.ratings.filter(r => r.rating === "again").length;
     document.getElementById("flashcard").innerHTML = `
       <div style="text-align:center; padding: 20px;">
         <div style="font-family:'Syne',sans-serif; font-size: 28px; font-weight:800; margin-bottom: 12px;">🎉 Review Complete!</div>
-        <div style="color: var(--muted); margin-bottom: 24px;">You reviewed ${total} cards</div>
-        <div style="font-size: 14px; line-height: 1.8;">
-          <div>😎 Easy: ${easy}</div>
-          <div>🙂 Good: ${good}</div>
-          <div>😐 Hard: ${currentReview.ratings.filter(r => r.rating === "hard").length}</div>
-          <div>😩 Again: ${currentReview.ratings.filter(r => r.rating === "again").length}</div>
+        <div style="color: var(--muted); margin-bottom: 24px;">You reviewed ${total} card${total !== 1 ? "s" : ""}</div>
+        <div style="font-size: 14px; line-height: 2;">
+          <div>😎 Easy: ${easy} &nbsp; 🙂 Good: ${good} &nbsp; 😐 Hard: ${hard} &nbsp; 😩 Again: ${again}</div>
         </div>
         <button class="btn-primary" style="margin-top: 24px;" onclick="closeReview();renderAll();">Done</button>
       </div>
@@ -499,12 +633,13 @@ function closeReview() {
   document.getElementById("cardModal").classList.remove("active");
   currentReview = null;
   renderStats();
+  renderDue();
 }
 
 // ── Export / Clear ────────────────────────────────────────────────────────────
 function setupExports() {
   document.getElementById("exportBtn").addEventListener("click", () => {
-    const data = JSON.stringify(allSessions, null, 2);
+    const data = JSON.stringify({ sessions: allSessions, srsData }, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -517,7 +652,8 @@ function setupExports() {
     if (!confirm("Delete ALL sessions permanently? This cannot be undone.")) return;
     if (!confirm("Are you absolutely sure? All your study history will be lost.")) return;
     allSessions = [];
-    await chrome.storage.local.set({ sessions: [] });
+    srsData = {};
+    await chrome.storage.local.set({ sessions: [], srsData: {} });
     renderAll();
   });
 }
@@ -529,9 +665,8 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-// Expose functions used in inline onclick handlers
-window.closeQuiz = closeQuiz;
+window.closeQuiz   = closeQuiz;
 window.closeReview = closeReview;
-window.renderAll = renderAll;
+window.renderAll   = renderAll;
 
 init();

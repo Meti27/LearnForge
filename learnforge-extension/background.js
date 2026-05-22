@@ -4,9 +4,43 @@ const ALARM_NAME = "learnforge-review-reminder";
 let isGenerating = false;
 
 // ── Supabase config (public anon key — safe to include in extension) ──────────
-// Fill these in once you have your Supabase project URL and anon key.
 const SUPABASE_URL = "https://jkiredgrbecwdunglmko.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpraXJlZGdyYmVjd2R1bmdsbWtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjg1MTUsImV4cCI6MjA5NDYwNDUxNX0.lfxJUoaJbtiRvzL5gNL2uZl0dsOjG5_9FaU02JE-Zsg";
+
+// ── Auth: catch the OAuth redirect tab instead of relying on sendMessage ───────
+// Works for any installed extension regardless of ID — no externally_connectable needed
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  if (!tab.url?.includes("/auth/extension-login")) return;
+
+  try {
+    const hash = new URL(tab.url).hash.slice(1);
+    if (!hash) return;
+
+    const params = new URLSearchParams(hash);
+    const accessToken  = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    if (!accessToken || !refreshToken) return;
+
+    // Fetch user profile using the access token
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { "Authorization": `Bearer ${accessToken}`, "apikey": SUPABASE_ANON_KEY },
+    });
+    if (!userRes.ok) return;
+    const user = await userRes.json();
+
+    await chrome.storage.local.set({
+      authToken: { accessToken, refreshToken, savedAt: Date.now() },
+      authUser:  { id: user.id, email: user.email, name: user.user_metadata?.full_name || "" },
+    });
+
+    chrome.tabs.remove(tabId);
+    syncPendingSessions().catch(() => {});
+    console.log("[LearnForge] Signed in as:", user.email);
+  } catch (e) {
+    console.warn("[LearnForge] Auth tab catch failed:", e.message);
+  }
+});
 
 // ── Message listener ──────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -30,21 +64,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: true });
   }
 
-  // Sent by the website's /auth/extension-login page after Google OAuth
-  if (msg.type === "AUTH_TOKEN") {
-    handleAuthToken(msg)
-      .then(() => sendResponse({ ok: true }))
-      .catch(e => sendResponse({ ok: false, error: e.message }));
-    return true;
-  }
-
-  // Sent by popup sign-out button
   if (msg.type === "SIGN_OUT") {
     chrome.storage.local.remove(["authToken", "authUser"]);
     sendResponse({ ok: true });
   }
 
-  // Sent by popup on open to restore auth state
   if (msg.type === "GET_AUTH_STATE") {
     chrome.storage.local.get(["authToken", "authUser"]).then(data => {
       sendResponse({
@@ -60,9 +84,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // ── Send a message to the popup (silently fails if popup is closed) ───────────
 async function notifyPopup(data) {
-  try {
-    await chrome.runtime.sendMessage(data);
-  } catch (_) {}
+  try { await chrome.runtime.sendMessage(data); } catch (_) {}
 }
 
 const GROQ_MODEL = "llama-3.3-70b-versatile";
@@ -125,9 +147,7 @@ async function handleGenerate(msg) {
         if (content) {
           rawText += content;
           tokenCount++;
-          if (tokenCount % 10 === 0) {
-            notifyPopup({ type: "GENERATE_PROGRESS", tokenCount });
-          }
+          if (tokenCount % 10 === 0) notifyPopup({ type: "GENERATE_PROGRESS", tokenCount });
         }
       } catch (_) {}
     }
@@ -138,15 +158,10 @@ async function handleGenerate(msg) {
   // ── Parse + filter ────────────────────────────────────────────────────────
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (e) {
-    throw new Error("Failed to parse AI response as JSON: " + e.message);
-  }
+  try { parsed = JSON.parse(cleaned); }
+  catch (e) { throw new Error("Failed to parse AI response as JSON: " + e.message); }
 
-  if (!parsed.quiz || !parsed.flashcards) {
-    throw new Error("AI response missing quiz or flashcards fields");
-  }
+  if (!parsed.quiz || !parsed.flashcards) throw new Error("AI response missing quiz or flashcards fields");
 
   parsed.flashcards = (parsed.flashcards || []).filter(card => {
     if (!card.front || !card.back) return false;
@@ -154,8 +169,7 @@ async function handleGenerate(msg) {
     const back  = card.back.trim();
     if (front.length < 8) return false;
     if (back.length < 25) return false;
-    const wc = front.split(/\s+/).length;
-    if (wc < 3 && !front.includes("?")) return false;
+    if (front.split(/\s+/).length < 3 && !front.includes("?")) return false;
     return true;
   });
 
@@ -172,7 +186,7 @@ async function handleGenerate(msg) {
     throw new Error("AI generated no valid cards. Try again or check the page content.");
   }
 
-  // ── Push to Anki ──────────────────────────────────────────────────────────
+  // ── Try Anki (optional — never blocks card saving) ────────────────────────
   const ankiResult = await pushToAnki(parsed.flashcards, deckName);
 
   // ── Save session ──────────────────────────────────────────────────────────
@@ -207,10 +221,7 @@ async function handleGenerate(msg) {
   });
 
   setReviewAlarm(deckName);
-
-  // Fire-and-forget cloud sync — never blocks the popup from showing results
   syncSessionToSupabase(session).catch(e => console.warn("[LearnForge] Sync failed:", e.message));
-
   notifyPopup({ type: "GENERATE_DONE", aiResult: parsed, ankiResult, deckName });
 }
 
@@ -238,8 +249,6 @@ function buildPrompt(text, title) {
 FLASHCARDS:
 - Generate 10-15 flashcards
 - "front" MUST be a full question, prompt, or fill-in-the-blank — NEVER just a bare term
-  Good: "What command in Linux lists open network ports?"
-  Bad:  "netstat"
 - "back" MUST be 2-4 sentences explaining the concept with concrete details
 - Cover different aspects: definitions, how-it-works, when-to-use, common-pitfalls, examples
 - Every card must be self-contained — readable without seeing the source page
@@ -248,9 +257,9 @@ QUIZ:
 - Generate 5-10 multiple choice questions
 - Each question has EXACTLY 4 options
 - "correct" is the 0-indexed position of the right answer (0, 1, 2, or 3)
-- Distractors (wrong options) must be plausible — same topic, similar length, not obviously silly
+- Distractors must be plausible — same topic, similar length, not obviously silly
 - Test understanding, not memorization of trivia
-- Vary the correct answer position across questions (don't always make it 0)
+- Vary the correct answer position across questions
 
 ================ PAGE TITLE ================
 ${title}
@@ -274,12 +283,12 @@ Output ONLY a single valid JSON object — no markdown, no commentary, no code f
 Begin JSON output now:`;
 }
 
-// ── AnkiConnect ───────────────────────────────────────────────────────────────
+// ── AnkiConnect (optional — failure is non-blocking) ──────────────────────────
 async function pushToAnki(flashcards, deckName) {
   try {
     await ankiRequest("createDeck", { deck: deckName });
   } catch (e) {
-    return { success: false, added: 0, error: "Could not reach AnkiConnect. Make sure Anki is open with AnkiConnect installed.", notRunning: true };
+    return { success: false, added: 0, notRunning: true, error: "Anki not running" };
   }
 
   const notes = flashcards.map(card => ({
@@ -287,7 +296,7 @@ async function pushToAnki(flashcards, deckName) {
     modelName: "Basic",
     fields: { Front: card.front, Back: card.back },
     options: { allowDuplicate: false, duplicateScope: "deck" },
-    tags: ["learnforge", "auto-generated"],
+    tags: ["learnforge"],
   }));
 
   try {
@@ -311,42 +320,25 @@ async function ankiRequest(action, params = {}) {
   return data.result;
 }
 
-// ── Auth handlers ─────────────────────────────────────────────────────────────
-
-async function handleAuthToken(msg) {
-  const { accessToken, refreshToken, user } = msg;
-  await chrome.storage.local.set({
-    authToken: { accessToken, refreshToken, savedAt: Date.now() },
-    authUser:  { id: user.id, email: user.email, name: user.user_metadata?.full_name || "" },
-  });
-  // Close the extension-login tab automatically
-  const tabs = await chrome.tabs.query({ url: "https://learn-forge-rho.vercel.app/auth/extension-login*" });
-  for (const tab of tabs) chrome.tabs.remove(tab.id);
-  // Sync any sessions that were generated before the user logged in
-  syncPendingSessions().catch(() => {});
-  console.log("[LearnForge] Signed in as:", user.email);
-}
-
 // ── Supabase sync ─────────────────────────────────────────────────────────────
-
 async function syncSessionToSupabase(session) {
   const stored = await chrome.storage.local.get(["authToken", "authUser"]);
-  if (!stored.authToken?.accessToken || !stored.authUser?.id) return; // not logged in
+  if (!stored.authToken?.accessToken || !stored.authUser?.id) return;
 
   const row = {
-    id:            session.id,
-    user_id:       stored.authUser.id,
-    title:         session.title,
-    url:           session.url,
-    domain:        session.domain,
-    deck:          session.deck,
-    timestamp:     session.timestamp,
-    quiz:          session.quiz,
-    flashcards:    session.flashcards,
-    quiz_results:  session.quizResults,
+    id:             session.id,
+    user_id:        stored.authUser.id,
+    title:          session.title,
+    url:            session.url,
+    domain:         session.domain,
+    deck:           session.deck,
+    timestamp:      session.timestamp,
+    quiz:           session.quiz,
+    flashcards:     session.flashcards,
+    quiz_results:   session.quizResults,
     cards_reviewed: session.cardsReviewed,
-    added_to_anki: session.addedToAnki,
-    synced_at:     new Date().toISOString(),
+    added_to_anki:  session.addedToAnki,
+    synced_at:      new Date().toISOString(),
   };
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/sessions`, {
@@ -390,7 +382,6 @@ async function refreshAccessToken() {
   });
 
   if (!res.ok) {
-    // Refresh failed — user needs to sign in again
     await chrome.storage.local.remove(["authToken", "authUser"]);
     return null;
   }
@@ -409,24 +400,15 @@ async function syncPendingSessions() {
   const uid = stored.authUser.id;
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/sessions?select=id&user_id=eq.${uid}&limit=500`,
-    {
-      headers: {
-        "Authorization": `Bearer ${stored.authToken.accessToken}`,
-        "apikey": SUPABASE_ANON_KEY,
-      },
-    }
+    { headers: { "Authorization": `Bearer ${stored.authToken.accessToken}`, "apikey": SUPABASE_ANON_KEY } }
   );
   if (!res.ok) return;
 
   const synced = await res.json();
   const syncedIds = new Set(synced.map(r => r.id));
-
   for (const session of stored.sessions) {
-    if (!syncedIds.has(session.id)) {
-      await syncSessionToSupabase(session).catch(() => {});
-    }
+    if (!syncedIds.has(session.id)) await syncSessionToSupabase(session).catch(() => {});
   }
-  console.log("[LearnForge] Pending sync complete.");
 }
 
 // ── Alarm helpers ─────────────────────────────────────────────────────────────
@@ -434,36 +416,45 @@ async function setReviewAlarm(deckName) {
   await chrome.alarms.clear(ALARM_NAME);
   await chrome.storage.local.set({ lastDeckName: deckName, lastAddedAt: Date.now() });
   chrome.alarms.create(ALARM_NAME, { delayInMinutes: 24 * 60 });
-  console.log("[LearnForge] Review alarm set for 24 hours.");
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
-  const stored = await chrome.storage.local.get(["lastDeckName"]);
-  const deckName = stored.lastDeckName || "LearnForge";
+  const stored = await chrome.storage.local.get(["lastDeckName", "srsData", "sessions"]);
+
+  // Count cards actually due
+  let dueCount = 0;
+  if (stored.srsData && stored.sessions) {
+    const now = Date.now();
+    stored.sessions.forEach(s => {
+      (s.flashcards || []).forEach((_, i) => {
+        const srs = stored.srsData[`${s.id}:${i}`];
+        if (!srs || srs.nextReview <= now) dueCount++;
+      });
+    });
+  }
+
+  const msg = dueCount > 0
+    ? `${dueCount} flashcard${dueCount !== 1 ? "s" : ""} due for review. Open the dashboard to study!`
+    : "Time for your daily review. Open the dashboard to keep your streak going!";
+
   chrome.notifications.create(`learnforge-${Date.now()}`, {
     type: "basic",
     iconUrl: "icons/icon128.png",
-    title: "⚡ LearnForge — Time to Review!",
-    message: `Your "${deckName}" cards are due for review in Anki. Open Anki and study now! 🧠`,
-    buttons: [{ title: "Open Anki" }],
+    title: "⚡ LearnForge — Review Time",
+    message: msg,
     priority: 2,
-    requireInteraction: true,
   });
   chrome.alarms.create(ALARM_NAME, { delayInMinutes: 24 * 60 });
 });
 
-chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-  if (buttonIndex === 0) chrome.tabs.create({ url: "https://apps.ankiweb.net/" });
-  chrome.notifications.clear(notificationId);
-});
-
 chrome.notifications.onClicked.addListener((notificationId) => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
   chrome.notifications.clear(notificationId);
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("[LearnForge] Extension installed. Ready to forge flashcards.");
+  console.log("[LearnForge] Extension installed.");
   syncPendingSessions().catch(() => {});
 });
 

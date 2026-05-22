@@ -300,6 +300,30 @@ body::before {
 .rating-btn.hard:hover { border-color: var(--amber); color: var(--amber); }
 .rating-btn.good:hover { border-color: var(--green); color: var(--green); }
 .rating-btn.easy:hover { border-color: var(--accent2); color: var(--accent2); }
+.rating-interval { display: block; font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 400; }
+.card-next-review { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; letter-spacing: 0.5px; }
+
+/* DUE SECTION */
+.due-section { margin: 20px 0; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+.due-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.due-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.due-count { font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; }
+.due-preview { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.due-card-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.due-chip-text { font-size: 12px; color: var(--muted2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.due-chip-tag { font-size: 10px; color: var(--muted); background: var(--border); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+.due-more { justify-content: center; color: var(--muted); font-size: 12px; }
+.btn-review-due { width: 100%; padding: 11px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; letter-spacing: 0.5px; transition: opacity .15s; }
+.btn-review-due:hover { opacity: 0.88; }
+
+/* SRS SETTINGS */
+.srs-settings-grid { display: flex; flex-direction: column; gap: 12px; max-width: 400px; }
+.srs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.srs-label { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--text); }
+.srs-input-wrap { display: flex; align-items: center; gap: 8px; }
+.srs-input { width: 70px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: 13px; text-align: center; }
+.srs-input:focus { outline: none; border-color: var(--accent); }
+.srs-unit { font-size: 11px; color: var(--muted); }
 
 .card-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
 .card-counter { color: var(--muted); font-size: 12px; }
@@ -352,6 +376,7 @@ body::before {
     <button class="tab active" data-tab="overview">Overview</button>
     <button class="tab" data-tab="sessions">Sessions</button>
     <button class="tab" data-tab="study">Study</button>
+    <button class="tab" data-tab="settings">Settings</button>
   </div>
 </div>
 
@@ -396,6 +421,8 @@ body::before {
     </div>
   </div>
 
+  <div id="dueSection" class="due-section"></div>
+
   <div class="section-title">Recent Activity <span class="count" id="recentCount"></span></div>
   <div class="session-list" id="recentSessions"></div>
 </div>
@@ -428,6 +455,43 @@ body::before {
 
   <div class="section-title">Study by Session</div>
   <div class="session-list" id="studySessions"></div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="panel" id="panel-settings">
+  <div class="section-title">Spaced Repetition Intervals</div>
+  <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">When you rate a card, it reappears after this delay. Again/Hard are in minutes, Good/Easy in days.</p>
+  <div class="srs-settings-grid" id="srsSettingsPanel">
+    <div class="srs-row">
+      <div class="srs-label"><span style="font-size:16px;">😩</span> Again</div>
+      <div class="srs-input-wrap">
+        <input type="number" id="srs_again" min="1" max="60" class="srs-input" />
+        <span class="srs-unit">minutes</span>
+      </div>
+    </div>
+    <div class="srs-row">
+      <div class="srs-label"><span style="font-size:16px;">😐</span> Hard</div>
+      <div class="srs-input-wrap">
+        <input type="number" id="srs_hard" min="1" max="1440" class="srs-input" />
+        <span class="srs-unit">minutes</span>
+      </div>
+    </div>
+    <div class="srs-row">
+      <div class="srs-label"><span style="font-size:16px;">🙂</span> Good</div>
+      <div class="srs-input-wrap">
+        <input type="number" id="srs_good" min="1" max="365" class="srs-input" />
+        <span class="srs-unit">days</span>
+      </div>
+    </div>
+    <div class="srs-row">
+      <div class="srs-label"><span style="font-size:16px;">😎</span> Easy</div>
+      <div class="srs-input-wrap">
+        <input type="number" id="srs_easy" min="1" max="365" class="srs-input" />
+        <span class="srs-unit">days</span>
+      </div>
+    </div>
+  </div>
+  <p style="color: var(--muted); font-size: 11px; margin-top: 16px;">Changes save automatically.</p>
 </div>
 
 </div>
@@ -463,11 +527,12 @@ body::before {
       <div class="card-content" id="cardContent">Loading...</div>
       <div class="card-hint" id="cardHint">click to reveal answer</div>
     </div>
+    <div class="card-next-review" id="cardNextReview"></div>
     <div class="card-actions" id="cardActions" style="display:none;">
-      <button class="rating-btn again" data-rating="again">😩 Again</button>
-      <button class="rating-btn hard" data-rating="hard">😐 Hard</button>
-      <button class="rating-btn good" data-rating="good">🙂 Good</button>
-      <button class="rating-btn easy" data-rating="easy">😎 Easy</button>
+      <button class="rating-btn again" data-rating="again">😩 Again<span class="rating-interval">1m</span></button>
+      <button class="rating-btn hard" data-rating="hard">😐 Hard<span class="rating-interval">10m</span></button>
+      <button class="rating-btn good" data-rating="good">🙂 Good<span class="rating-interval">1d</span></button>
+      <button class="rating-btn easy" data-rating="easy">😎 Easy<span class="rating-interval">3d</span></button>
     </div>
   </div>
 </div>
