@@ -412,7 +412,7 @@ function setupModals() {
     }
     if (document.getElementById("cardModal").classList.contains("active")) {
       if (e.key === "Escape") closeReview();
-      if (e.key === " ") { e.preventDefault(); flipCard(); }
+      if ((e.key === " " || e.key === "Enter") && !currentReview?.flipped) { e.preventDefault(); flipCard(); }
       if (currentReview?.flipped) {
         if (e.key === "1") rateCard("again");
         if (e.key === "2") rateCard("hard");

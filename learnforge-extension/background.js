@@ -113,7 +113,7 @@ async function handleGenerate(msg) {
         response_format: { type: "json_object" },
         stream: true,
         temperature: 0.3,
-        max_tokens: 4096,
+        max_tokens: 8192,
       }),
     });
   } catch (e) {
@@ -247,14 +247,15 @@ function buildPrompt(text, title) {
 ================ RULES (MUST FOLLOW) ================
 
 FLASHCARDS:
-- Generate 10-15 flashcards
+- Before generating, identify which concepts a student genuinely NEEDS to understand from this content — key ideas, techniques, definitions, how things work, and common pitfalls. Skip anything trivial, obvious, or purely supplementary.
+- Generate one flashcard per concept worth studying. Do not pad with filler and do not cap at an arbitrary number — let the importance of the content decide.
 - "front" MUST be a full question, prompt, or fill-in-the-blank — NEVER just a bare term
 - "back" MUST be 2-4 sentences explaining the concept with concrete details
 - Cover different aspects: definitions, how-it-works, when-to-use, common-pitfalls, examples
 - Every card must be self-contained — readable without seeing the source page
 
 QUIZ:
-- Generate 5-10 multiple choice questions
+- From the same key concepts you identified for flashcards, generate a quiz question for each one that is worth testing understanding on. Skip obvious or trivial points. Do not cap at an arbitrary number.
 - Each question has EXACTLY 4 options
 - "correct" is the 0-indexed position of the right answer (0, 1, 2, or 3)
 - Distractors must be plausible — same topic, similar length, not obviously silly

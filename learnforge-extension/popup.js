@@ -441,7 +441,7 @@ $quizToggle.addEventListener("click", () => {
 
 // ── Open dashboard ────────────────────────────────────────────────────────────
 document.getElementById("openDashboard").addEventListener("click", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  chrome.tabs.create({ url: "https://learn-forge-rho.vercel.app/dashboard" });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
