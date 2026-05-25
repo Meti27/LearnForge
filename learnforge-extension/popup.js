@@ -32,9 +32,11 @@ const $mainBtn     = document.getElementById("mainBtn");
 const $quizToggle  = document.getElementById("quizToggle");
 const $quizArea    = document.getElementById("quizArea");
 const $quizArrow   = document.getElementById("quizArrow");
-const $groqKey        = document.getElementById("groqApiKey");
+const $aiApiKey       = document.getElementById("aiApiKey");
 const $saveApiKey     = document.getElementById("saveApiKey");
 const $keyStatus      = document.getElementById("keyStatus");
+const $keyHelp        = document.getElementById("keyHelp");
+const $providerTabs   = document.getElementById("providerTabs");
 const $authLoggedOut  = document.getElementById("authLoggedOut");
 const $authLoggedIn   = document.getElementById("authLoggedIn");
 const $authEmail      = document.getElementById("authEmail");
@@ -82,13 +84,55 @@ async function init() {
   }
 }
 
-// ── Groq API key management ───────────────────────────────────────────────────
+// ── AI provider + key management ─────────────────────────────────────────────
+const PROVIDER_META = {
+  gemini: {
+    placeholder: "AIza···  Gemini API key",
+    savedPlaceholder: "AIza••••••••••••••••••",
+    helpHtml: 'Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>',
+    storageKey: "geminiApiKey",
+    label: "Gemini",
+  },
+  groq: {
+    placeholder: "gsk_···  Groq API key",
+    savedPlaceholder: "gsk_••••••••••••••••••••",
+    helpHtml: 'Get a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>',
+    storageKey: "groqApiKey",
+    label: "Groq",
+  },
+};
+
+let activeProvider = "gemini";
+
+function setProvider(provider) {
+  activeProvider = provider;
+  $providerTabs.querySelectorAll(".provider-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.provider === provider);
+  });
+  const meta = PROVIDER_META[provider];
+  $aiApiKey.placeholder = meta.placeholder;
+  $keyHelp.innerHTML = meta.helpHtml;
+}
+
+$providerTabs.addEventListener("click", async e => {
+  const btn = e.target.closest(".provider-tab");
+  if (!btn) return;
+  const provider = btn.dataset.provider;
+  await chrome.storage.local.set({ aiProvider: provider });
+  setProvider(provider);
+  await loadKeyStatus();
+});
+
 async function loadKeyStatus() {
-  const stored = await chrome.storage.local.get("groqApiKey");
-  if (stored.groqApiKey) {
-    $keyStatus.textContent = "Key saved ✓";
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey"]);
+  const provider = stored.aiProvider || "gemini";
+  setProvider(provider);
+  const meta = PROVIDER_META[provider];
+  const key = stored[meta.storageKey];
+  if (key) {
+    $keyStatus.textContent = `${meta.label} key saved ✓`;
     $keyStatus.className = "key-status saved";
-    $groqKey.placeholder = "gsk_••••••••••••••••••••";
+    $aiApiKey.placeholder = meta.savedPlaceholder;
   } else {
     $keyStatus.textContent = "No API key saved";
     $keyStatus.className = "key-status missing";
@@ -96,14 +140,15 @@ async function loadKeyStatus() {
 }
 
 $saveApiKey.addEventListener("click", async () => {
-  const key = $groqKey.value.trim();
+  const key = $aiApiKey.value.trim();
   if (!key) return;
-  await chrome.storage.local.set({ groqApiKey: key });
-  $groqKey.value = "";
-  $groqKey.placeholder = "gsk_••••••••••••••••••••";
-  $keyStatus.textContent = "Key saved ✓";
+  const meta = PROVIDER_META[activeProvider];
+  await chrome.storage.local.set({ [meta.storageKey]: key, aiProvider: activeProvider });
+  $aiApiKey.value = "";
+  $aiApiKey.placeholder = meta.savedPlaceholder;
+  $keyStatus.textContent = `${meta.label} key saved ✓`;
   $keyStatus.className = "key-status saved";
-  log("Groq API key saved.", "ok");
+  log(`${meta.label} API key saved.`, "ok");
 });
 
 // ── Auth state ────────────────────────────────────────────────────────────────
@@ -317,10 +362,12 @@ function setButtonState(s) {
 $mainBtn.addEventListener("click", async () => {
   if (state.status === "running") return;
 
-  const stored = await chrome.storage.local.get(["deckName", "groqApiKey"]);
+  const stored = await chrome.storage.local.get(["deckName", "aiProvider", "groqApiKey", "geminiApiKey"]);
+  const provider = stored.aiProvider || "gemini";
+  const meta = PROVIDER_META[provider];
 
-  if (!stored.groqApiKey) {
-    log("No Groq API key saved. Enter your key above and click Save.", "err");
+  if (!stored[meta.storageKey]) {
+    log(`No ${meta.label} API key saved. Enter your key above and click Save.`, "err");
     return;
   }
 

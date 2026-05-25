@@ -93,7 +93,10 @@ Sessions are stored as an array in `chrome.storage.local` under the key `session
 
 All notable changes made across sessions. Newest first.
 
-### 2026-05-25
+### 2026-05-25 (session 2)
+- **Multi-provider AI** — popup now has Gemini / Groq tab selector. Keys stored separately as `geminiApiKey` and `groqApiKey`. `aiProvider` in `chrome.storage.local` tracks active choice. `background.js` routes to `callGemini()` or `callGroq()` accordingly. Gemini 2.0 Flash is the new default (free via aistudio.google.com). Both use streaming SSE. Groq kept for existing users. Anthropic intentionally not added yet — to be added when user has budget.
+
+### 2026-05-25 (session 1)
 - **PDF support** — `isPdfUrl` + `extractPdfText` added to `popup.js`. Detects `.pdf` URLs and uses PDF.js 3.11.174 (bundled in `lib/`) to extract text before handing off to the same Groq pipeline. Handles password-protected, image-only, and `file://` PDFs with specific error messages. `manifest.json` updated with `web_accessible_resources` for the PDF.js worker. `popup.html` loads `lib/pdf.min.js` before `popup.js`.
 - **AI prompt overhaul** — `buildPrompt` in `background.js` rewritten to use a two-phase catalog approach. Added system message pushing the model to generate more cards. Removed conservative "skip trivial" language. Temperature raised 0.3 → 0.4.
 - **Quiz letter color** — `.q-letter` in `popup.html` now has explicit `color: var(--text)` so A/B/C/D are readable on the dark purple background.

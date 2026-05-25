@@ -264,6 +264,26 @@
     .key-status.saved { color: var(--green); }
     .key-status.missing { color: var(--gold); }
 
+    /* ── PROVIDER TABS ────────────────────────────────────── */
+    .provider-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+    .provider-tab {
+      flex: 1; padding: 6px 8px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted2); font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-family: 'Syne', sans-serif;
+    }
+    .provider-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .ptag {
+      font-size: 9px; font-weight: 700; padding: 1px 4px;
+      border-radius: 3px; background: rgba(255,255,255,.18); letter-spacing: .3px;
+    }
+    .ptag.best { background: rgba(255,255,255,.3); }
+    .key-help { font-size: 10px; color: var(--muted2); margin-top: 4px; }
+    .key-help a { color: var(--accent); text-decoration: none; }
+    .key-help a:hover { text-decoration: underline; }
+
     /* ── SITE CHIPS ───────────────────────────────────────── */
     .sites-grid {
       display: grid;
@@ -723,10 +743,15 @@
   <!-- ── AI ENGINE ──────────────────────────────────────────── -->
   <div class="section">
     <div class="section-label">AI Engine</div>
+    <div class="provider-tabs" id="providerTabs">
+      <button class="provider-tab active" data-provider="gemini">Gemini <span class="ptag best">Best Free</span></button>
+      <button class="provider-tab" data-provider="groq">Groq <span class="ptag">Free</span></button>
+    </div>
     <div class="input-row">
-      <input type="password" class="api-input" id="groqApiKey" placeholder="gsk_···  Groq API key" autocomplete="off" />
+      <input type="password" class="api-input" id="aiApiKey" autocomplete="off" />
       <button class="btn-save" id="saveApiKey">Save</button>
     </div>
+    <div class="key-help" id="keyHelp"></div>
     <div class="key-status missing" id="keyStatus">Add your key to unlock AI generation</div>
   </div>
 

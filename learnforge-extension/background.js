@@ -87,35 +87,18 @@ async function notifyPopup(data) {
   try { await chrome.runtime.sendMessage(data); } catch (_) {}
 }
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const SYSTEM_PROMPT = "You are an expert study material creator. When given educational content, you extract comprehensive flashcards and quiz questions covering EVERY distinct concept, definition, technique, comparison, and process present in the text. You always err on the side of MORE cards — if a concept is mentioned and explained, it gets a card. You never skip things because they seem basic. Dense technical content should produce 20+ cards. Your output is always valid JSON.";
 
-// ── Main generate flow ────────────────────────────────────────────────────────
-async function handleGenerate(msg) {
-  const { text, title, url, domain, deckName } = msg;
-
-  await chrome.storage.local.set({ lastRun: { status: "running" } });
-
-  const { groqApiKey } = await chrome.storage.local.get("groqApiKey");
-  if (!groqApiKey) throw new Error("No Groq API key saved. Enter it in the popup.");
-
-  // ── Call Groq with streaming ──────────────────────────────────────────────
+// ── Groq (OpenAI-compatible, streaming) ───────────────────────────────────────
+async function callGroq(apiKey, userPrompt) {
   let response;
   try {
     response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${groqApiKey}`,
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert study material creator. When given educational content, you extract comprehensive flashcards and quiz questions covering EVERY distinct concept, definition, technique, comparison, and process present in the text. You always err on the side of MORE cards — if a concept is mentioned and explained, it gets a card. You never skip things because they seem basic. Dense technical content should produce 20+ cards. Your output is always valid JSON.",
-          },
-          { role: "user", content: buildPrompt(text, title) },
-        ],
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userPrompt }],
         response_format: { type: "json_object" },
         stream: true,
         temperature: 0.4,
@@ -125,18 +108,13 @@ async function handleGenerate(msg) {
   } catch (e) {
     throw new Error("Cannot reach Groq API. Check your internet connection.");
   }
-
   if (response.status === 401) throw new Error("Invalid Groq API key. Update it in the popup.");
   if (response.status === 429) throw new Error("Groq rate limit hit. Wait a moment and try again.");
   if (!response.ok) throw new Error(`Groq API error ${response.status}`);
 
-  // ── Read SSE stream ───────────────────────────────────────────────────────
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let rawText = "";
-  let tokenCount = 0;
-  let buf = "";
-
+  let rawText = "", tokenCount = 0, buf = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -158,8 +136,82 @@ async function handleGenerate(msg) {
       } catch (_) {}
     }
   }
-
   notifyPopup({ type: "GENERATE_PROGRESS", tokenCount, done: true });
+  return rawText;
+}
+
+// ── Gemini (streaming SSE) ────────────────────────────────────────────────────
+async function callGemini(apiKey, userPrompt) {
+  let response;
+  try {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.4,
+            maxOutputTokens: 8192,
+          },
+        }),
+      }
+    );
+  } catch (e) {
+    throw new Error("Cannot reach Gemini API. Check your internet connection.");
+  }
+  if (response.status === 400) throw new Error("Gemini API error: bad request. Check your API key.");
+  if (response.status === 403) throw new Error("Invalid Gemini API key. Update it in the popup.");
+  if (response.status === 429) throw new Error("Gemini rate limit hit. Wait a moment and try again.");
+  if (!response.ok) throw new Error(`Gemini API error ${response.status}`);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let rawText = "", tokenCount = 0, buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6).trim();
+      try {
+        const chunk = JSON.parse(payload);
+        const content = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (content) {
+          rawText += content;
+          tokenCount++;
+          if (tokenCount % 10 === 0) notifyPopup({ type: "GENERATE_PROGRESS", tokenCount });
+        }
+      } catch (_) {}
+    }
+  }
+  notifyPopup({ type: "GENERATE_PROGRESS", tokenCount, done: true });
+  return rawText;
+}
+
+// ── Main generate flow ────────────────────────────────────────────────────────
+async function handleGenerate(msg) {
+  const { text, title, url, domain, deckName } = msg;
+
+  await chrome.storage.local.set({ lastRun: { status: "running" } });
+
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey"]);
+  const provider = stored.aiProvider || "gemini";
+
+  let rawText;
+  if (provider === "gemini") {
+    if (!stored.geminiApiKey) throw new Error("No Gemini API key saved. Enter it in the popup.");
+    rawText = await callGemini(stored.geminiApiKey, buildPrompt(text, title));
+  } else {
+    if (!stored.groqApiKey) throw new Error("No Groq API key saved. Enter it in the popup.");
+    rawText = await callGroq(stored.groqApiKey, buildPrompt(text, title));
+  }
 
   // ── Parse + filter ────────────────────────────────────────────────────────
   const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
