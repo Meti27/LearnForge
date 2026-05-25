@@ -15,32 +15,38 @@ LearnForge is a Manifest V3 Chrome/Brave extension. There is no build step, no p
 
 ## External runtime dependencies
 
-The extension makes two local HTTP calls at runtime — both must be running:
-
 | Service | Endpoint | Purpose |
 |---------|----------|---------|
-| Ollama | `http://localhost:11434` | AI generation — requires model `qwen2.5:14b` pulled (`ollama pull qwen2.5:14b`) |
-| AnkiConnect | `http://localhost:8765` | Pushing flashcards into Anki desktop — add-on code `2055492159` |
+| Groq API | `https://api.groq.com` | AI generation — model `llama-3.3-70b-versatile`. User provides their own API key stored in `chrome.storage.local` as `groqApiKey`. |
+| AnkiConnect | `http://localhost:8765` | Pushing flashcards into Anki desktop (optional) — add-on code `2055492159` |
 
-The popup's `checkOllamaStatus()` function pings `http://localhost:11434/api/tags` on open and checks specifically for `qwen2.5:14b` in the model list.
+Ollama was the original AI backend and is **no longer used**. All references to Ollama in `index.html` are stale and need updating.
 
 ## Architecture
 
 ### Entry points
 
-- **`popup.html` / `popup.js`** — the main extension UI (380px wide). Orchestrates the entire generate flow: tab detection → content scraping → Ollama call → AnkiConnect push → session storage.
-- **`dashboard.html` / `dashboard.js`** — full-page study dashboard opened in a new tab. Reads sessions from `chrome.storage.local` and provides quiz + flashcard review modals.
-- **`background.js`** — service worker. Only handles `chrome.alarms` (24-hour review reminders) and `chrome.notifications`. Receives `{ type: "SET_ALARM", deckName }` messages from the popup.
+- **`popup.html` / `popup.js`** — the main extension UI (380px wide). Orchestrates the generate flow: tab detection → PDF or webpage scraping → sends `GENERATE` message to background.js → receives result → session storage.
+- **`dashboard.html` / `dashboard.js`** — full-page study dashboard opened in a new tab. Reads sessions from `chrome.storage.local` and provides quiz + flashcard review modals with full SRS.
+- **`background.js`** — service worker. Handles the Groq API call (`handleGenerate`), `buildPrompt`, `pushToAnki`, `chrome.alarms` (24-hour review reminders), and `chrome.notifications`. Receives `{ type: "GENERATE", text, title, url, domain, deckName }` from popup.
 - **`content.js`** — injected into the active tab via `chrome.scripting.executeScript`. Scrapes meaningful text using a priority list of CSS selectors (`CONTENT_SELECTORS`) while skipping navigation noise (`SKIP_SELECTORS`). Returns `{ title, url, text, wordCount }` as the script result (not via `sendMessage`).
+- **`lib/pdf.min.js`** + **`lib/pdf.worker.min.js`** — PDF.js 3.11.174 bundled for PDF text extraction. Loaded in popup.html only.
 
 ### Data flow
 
 ```
 popup.js
-  → executeScript(content.js)          # scrape active tab
-  → callClaudeAPI(text, title)          # POST to Ollama /api/generate
-  → pushToAnki(flashcards, deckName)    # POST to AnkiConnect localhost:8765
-  → chrome.storage.local.set(sessions) # persist session object
+  → isPdfUrl(tab.url)?
+      YES → extractPdfText(url)          # fetch + PDF.js parse in popup context
+      NO  → executeScript(content.js)    # scrape active tab HTML
+  → chrome.runtime.sendMessage(GENERATE, { text, title, url, domain, deckName })
+
+background.js (handleGenerate)
+  → buildPrompt(text, title)             # two-phase catalog prompt
+  → fetch Groq API (llama-3.3-70b-versatile, streaming, max_tokens 8192)
+  → pushToAnki(flashcards, deckName)     # POST to AnkiConnect localhost:8765 (optional)
+  → chrome.storage.local.set(sessions)  # persist session object
+  → notifyPopup(GENERATE_DONE)
   → chrome.runtime.sendMessage(SET_ALARM)
 ```
 
@@ -63,7 +69,11 @@ Sessions are stored as an array in `chrome.storage.local` under the key `session
 
 ### AI prompt
 
-`callClaudeAPI()` in `popup.js` (despite the name, it calls Ollama) sends a structured prompt capped at 12,000 characters of page text. It uses Ollama's `format: "json"` mode to force valid JSON output of `{ quiz, flashcards }`. The function then filters weak cards (front < 8 chars, back < 25 chars, bare single-word fronts).
+`buildPrompt()` in `background.js` sends a two-phase prompt (catalog → generate) capped at 12,000 characters of page text. Uses Groq's `response_format: { type: "json_object" }` to force valid JSON output of `{ quiz, flashcards }`. A system message instructs the model to always err on the side of more cards. Temperature is 0.4. The response is filtered for weak cards (front < 8 chars, back < 25 chars, bare single-word fronts).
+
+### PDF support
+
+`isPdfUrl(url)` in `popup.js` detects PDF tabs by checking the URL pathname for `.pdf`. `extractPdfText(url)` fetches the PDF bytes and uses PDF.js (bundled in `lib/`) to extract all text up to 60 pages. The extracted text flows into the same `GENERATE` message as a normal scrape result. Edge cases handled with explicit error messages: password-protected PDFs, image-only (scanned) PDFs, and local `file://` PDFs.
 
 ### Adding a new supported platform
 
@@ -77,3 +87,14 @@ Sessions are stored as an array in `chrome.storage.local` under the key `session
 - **`chrome.storage.local` only** — no IndexedDB, no remote sync. All state lives here.
 - **MV3 service worker** — `background.js` has no persistent state between events; store anything that must survive in `chrome.storage.local`.
 - **CSP** — inline event handlers (`onclick=`) are present in dashboard.html and work because there is no restrictive CSP declared in the manifest for extension pages.
+- **PDF.js in popup context** — PDF.js runs in `popup.html` (a regular extension page), not in the service worker. The worker is referenced via `chrome.runtime.getURL('lib/pdf.worker.min.js')` and exposed via `web_accessible_resources` in the manifest.
+
+## Changelog
+
+All notable changes made across sessions. Newest first.
+
+### 2026-05-25
+- **PDF support** — `isPdfUrl` + `extractPdfText` added to `popup.js`. Detects `.pdf` URLs and uses PDF.js 3.11.174 (bundled in `lib/`) to extract text before handing off to the same Groq pipeline. Handles password-protected, image-only, and `file://` PDFs with specific error messages. `manifest.json` updated with `web_accessible_resources` for the PDF.js worker. `popup.html` loads `lib/pdf.min.js` before `popup.js`.
+- **AI prompt overhaul** — `buildPrompt` in `background.js` rewritten to use a two-phase catalog approach. Added system message pushing the model to generate more cards. Removed conservative "skip trivial" language. Temperature raised 0.3 → 0.4.
+- **Quiz letter color** — `.q-letter` in `popup.html` now has explicit `color: var(--text)` so A/B/C/D are readable on the dark purple background.
+- **Architecture docs** — CLAUDE.md updated to reflect Groq (not Ollama), actual data flow, PDF support, and this changelog.

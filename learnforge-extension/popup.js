@@ -347,30 +347,42 @@ $mainBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Scrape content
+  // Scrape content — PDF path or normal webpage path
   let scrapeResult;
-  try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["content.js"],
-    });
-    scrapeResult = result?.result;
-  } catch (e) {
-    log("Script injection failed: " + e.message, "err");
-    log("Make sure you're on a supported page.", "warn");
-    setButtonState("error");
-    setProgress(0);
-    return;
-  }
+  if (isPdfUrl(tab.url)) {
+    log("PDF detected — extracting text...", "info");
+    try {
+      scrapeResult = await extractPdfText(tab.url);
+    } catch (e) {
+      log(e.message, "err");
+      setButtonState("error");
+      setProgress(0);
+      return;
+    }
+    log(`Extracted ${scrapeResult.wordCount} words from PDF.`, "ok");
+  } else {
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content.js"],
+      });
+      scrapeResult = result?.result;
+    } catch (e) {
+      log("Script injection failed: " + e.message, "err");
+      log("Make sure you're on a supported page.", "warn");
+      setButtonState("error");
+      setProgress(0);
+      return;
+    }
 
-  if (!scrapeResult || !scrapeResult.text || scrapeResult.text.length < 100) {
-    log("Not enough content scraped from this page.", "err");
-    setButtonState("error");
-    setProgress(0);
-    return;
+    if (!scrapeResult || !scrapeResult.text || scrapeResult.text.length < 100) {
+      log("Not enough content scraped from this page.", "err");
+      setButtonState("error");
+      setProgress(0);
+      return;
+    }
+    log(`Scraped ${scrapeResult.wordCount} words from page.`, "ok");
   }
-
-  log(`Scraped ${scrapeResult.wordCount} words from page.`, "ok");
   log("Sending to AI — feel free to close this and come back.", "info");
   setProgress(35);
 
@@ -386,6 +398,62 @@ $mainBtn.addEventListener("click", async () => {
     deckName: deckNameVal,
   });
 });
+
+// ── PDF support ───────────────────────────────────────────────────────────────
+function isPdfUrl(url) {
+  if (!url) return false;
+  if (url.startsWith("file://")) return /\.pdf(\?|#|$)/i.test(url);
+  try {
+    const path = new URL(url).pathname;
+    return /\.pdf$/i.test(path);
+  } catch (_) { return false; }
+}
+
+async function extractPdfText(url) {
+  if (url.startsWith("file://")) {
+    throw new Error("Local PDF detected. Enable 'Allow access to file URLs' for LearnForge in chrome://extensions, then try again.");
+  }
+
+  let arrayBuffer;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    arrayBuffer = await resp.arrayBuffer();
+  } catch (e) {
+    throw new Error("Could not download PDF: " + e.message);
+  }
+
+  const pdfjsLib = window.pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("lib/pdf.worker.min.js");
+
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  } catch (e) {
+    if (e.name === "PasswordException") throw new Error("This PDF is password-protected and cannot be read.");
+    throw new Error("Failed to parse PDF: " + e.message);
+  }
+
+  const maxPages = Math.min(pdf.numPages, 60);
+  let text = "";
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(" ");
+    if (pageText.trim()) text += pageText + "\n\n";
+  }
+
+  if (!text.trim()) {
+    throw new Error("No text found in this PDF — it may be a scanned image. LearnForge cannot read image-only PDFs.");
+  }
+
+  const filename = decodeURIComponent(url.split("/").pop().split("?")[0]).replace(/\.pdf$/i, "");
+  return {
+    text: text.trim(),
+    title: filename || "PDF Document",
+    wordCount: text.trim().split(/\s+/).length,
+  };
+}
 
 // ── Anki status display ───────────────────────────────────────────────────────
 function showAnkiStatus(type, msg) {

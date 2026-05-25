@@ -109,10 +109,16 @@ async function handleGenerate(msg) {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: [{ role: "user", content: buildPrompt(text, title) }],
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert study material creator. When given educational content, you extract comprehensive flashcards and quiz questions covering EVERY distinct concept, definition, technique, comparison, and process present in the text. You always err on the side of MORE cards — if a concept is mentioned and explained, it gets a card. You never skip things because they seem basic. Dense technical content should produce 20+ cards. Your output is always valid JSON.",
+          },
+          { role: "user", content: buildPrompt(text, title) },
+        ],
         response_format: { type: "json_object" },
         stream: true,
-        temperature: 0.3,
+        temperature: 0.4,
         max_tokens: 8192,
       }),
     });
@@ -228,60 +234,46 @@ async function handleGenerate(msg) {
 // ── Prompt ────────────────────────────────────────────────────────────────────
 function buildPrompt(text, title) {
   const truncated = text.slice(0, 12000);
-  return `You are creating high-quality study materials. Your job is to read learning content and produce well-formed flashcards and quiz questions.
+  return `STEP 1 — CATALOG (think, do not output this step):
+Before writing any JSON, mentally list every distinct item in the content:
+• Definitions and terminology
+• How things work (mechanisms, algorithms, processes, steps)
+• Comparisons or differences (X vs Y, when to use X over Y)
+• Rules, constraints, requirements, limitations
+• Common mistakes, pitfalls, gotchas
+• Formulas, thresholds, numbers that matter
+• Examples that illustrate a principle
 
-================ EXAMPLES OF GOOD vs BAD OUTPUT ================
+Every item you catalog becomes exactly one flashcard AND one quiz question. Do not merge similar items — keep them separate. Do not skip anything the author explained — if it was worth explaining, it is worth a card.
 
-❌ BAD flashcard (too vague, no actual content):
-{ "front": "XSS", "back": "A web vulnerability." }
+STEP 2 — GENERATE OUTPUT:
 
-✅ GOOD flashcard (specific, complete, teaches something):
-{ "front": "What is Stored XSS and how does it differ from Reflected XSS?", "back": "Stored XSS occurs when malicious JavaScript is permanently saved on the target server (e.g., in a database, comment field, or user profile) and served to every visitor who views the affected page. Reflected XSS, by contrast, requires the victim to click a crafted URL because the payload is echoed back in the immediate HTTP response and not stored." }
+FLASHCARD RULES:
+- "front": A specific question ("How does X work?", "What is the difference between X and Y?", "When should you use X?") or fill-in-the-blank. NEVER a bare term.
+- "back": 2-4 sentences. Concrete. Self-contained — no "as mentioned above" or "see the article". Includes the key detail that makes it actually useful to know.
 
-❌ BAD quiz question (vague, ambiguous answer):
-{ "question": "What is XSS?", "options": ["Bad", "A vulnerability", "Code", "An attack"], "correct": 1 }
+GOOD flashcard example:
+{ "front": "What is Stored XSS and how does it differ from Reflected XSS?", "back": "Stored XSS permanently saves the malicious script on the server (e.g. in a comment field) so every visitor gets hit. Reflected XSS requires the victim to click a crafted URL — the payload is echoed back in the immediate response and never persisted. The key distinction is persistence: stored attacks are automatic and long-lasting; reflected attacks require user interaction each time." }
 
-✅ GOOD quiz question (specific, tests understanding):
-{ "question": "Which HTTP header, when properly configured, helps mitigate XSS by restricting which scripts can execute on a page?", "options": ["X-Frame-Options", "Content-Security-Policy", "Strict-Transport-Security", "X-Content-Type-Options"], "correct": 1 }
+QUIZ RULES:
+- One question per item in your catalog (same set as flashcards)
+- Exactly 4 options. Distractors must be plausible, same domain, similar length — not obviously wrong.
+- "correct" is the 0-indexed position (0–3). Vary correct position across questions.
+- Test understanding, not trivia.
 
-================ RULES (MUST FOLLOW) ================
+GOOD quiz example:
+{ "question": "Which HTTP header restricts which scripts can execute on a page, helping mitigate XSS?", "options": ["X-Frame-Options", "Content-Security-Policy", "Strict-Transport-Security", "X-Content-Type-Options"], "correct": 1 }
 
-FLASHCARDS:
-- Before generating, identify which concepts a student genuinely NEEDS to understand from this content — key ideas, techniques, definitions, how things work, and common pitfalls. Skip anything trivial, obvious, or purely supplementary.
-- Generate one flashcard per concept worth studying. Do not pad with filler and do not cap at an arbitrary number — let the importance of the content decide.
-- "front" MUST be a full question, prompt, or fill-in-the-blank — NEVER just a bare term
-- "back" MUST be 2-4 sentences explaining the concept with concrete details
-- Cover different aspects: definitions, how-it-works, when-to-use, common-pitfalls, examples
-- Every card must be self-contained — readable without seeing the source page
+PAGE TITLE: ${title}
 
-QUIZ:
-- From the same key concepts you identified for flashcards, generate a quiz question for each one that is worth testing understanding on. Skip obvious or trivial points. Do not cap at an arbitrary number.
-- Each question has EXACTLY 4 options
-- "correct" is the 0-indexed position of the right answer (0, 1, 2, or 3)
-- Distractors must be plausible — same topic, similar length, not obviously silly
-- Test understanding, not memorization of trivia
-- Vary the correct answer position across questions
-
-================ PAGE TITLE ================
-${title}
-
-================ PAGE CONTENT ================
+PAGE CONTENT:
 ${truncated}
 
-================ OUTPUT FORMAT ================
-
-Output ONLY a single valid JSON object — no markdown, no commentary, no code fences. Structure:
-
+Output ONLY valid JSON — no markdown, no code fences, no commentary:
 {
-  "quiz": [
-    { "question": "...", "options": ["...", "...", "...", "..."], "correct": 0 }
-  ],
-  "flashcards": [
-    { "front": "Full question or prompt", "back": "Complete 2-4 sentence explanation" }
-  ]
-}
-
-Begin JSON output now:`;
+  "quiz": [{ "question": "...", "options": ["...", "...", "...", "..."], "correct": 0 }],
+  "flashcards": [{ "front": "...", "back": "..." }]
+}`;
 }
 
 // ── AnkiConnect (optional — failure is non-blocking) ──────────────────────────
