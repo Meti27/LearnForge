@@ -101,6 +101,13 @@ const PROVIDER_META = {
     storageKey: "groqApiKey",
     label: "Groq",
   },
+  nvidia: {
+    placeholder: "nvapi-···  NVIDIA API key",
+    savedPlaceholder: "nvapi-••••••••••••••••••",
+    helpHtml: 'Get a free key at <a href="https://build.nvidia.com" target="_blank">build.nvidia.com</a> — runs DeepSeek R1',
+    storageKey: "nvidiaApiKey",
+    label: "NVIDIA",
+  },
 };
 
 let activeProvider = "gemini";
@@ -125,7 +132,7 @@ $providerTabs.addEventListener("click", async e => {
 });
 
 async function loadKeyStatus() {
-  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey"]);
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey"]);
   const provider = stored.aiProvider || "gemini";
   setProvider(provider);
   const meta = PROVIDER_META[provider];

@@ -140,6 +140,57 @@ async function callGroq(apiKey, userPrompt) {
   return rawText;
 }
 
+// ── NVIDIA NIM (OpenAI-compatible streaming) ──────────────────────────────────
+async function callNvidia(apiKey, userPrompt) {
+  let response;
+  try {
+    response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "deepseek-ai/deepseek-r1",
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userPrompt }],
+        response_format: { type: "json_object" },
+        stream: true,
+        temperature: 0.4,
+        max_tokens: 8192,
+      }),
+    });
+  } catch (e) {
+    throw new Error("Cannot reach NVIDIA API. Check your internet connection.");
+  }
+  if (response.status === 401) throw new Error("Invalid NVIDIA API key. Update it in the popup.");
+  if (response.status === 429) throw new Error("NVIDIA rate limit hit. Wait a moment and try again.");
+  if (!response.ok) throw new Error(`NVIDIA API error ${response.status}`);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let rawText = "", tokenCount = 0, buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6).trim();
+      if (payload === "[DONE]") break;
+      try {
+        const chunk = JSON.parse(payload);
+        const content = chunk.choices?.[0]?.delta?.content;
+        if (content) {
+          rawText += content;
+          tokenCount++;
+          if (tokenCount % 10 === 0) notifyPopup({ type: "GENERATE_PROGRESS", tokenCount });
+        }
+      } catch (_) {}
+    }
+  }
+  notifyPopup({ type: "GENERATE_PROGRESS", tokenCount, done: true });
+  return rawText;
+}
+
 // ── Gemini (streaming SSE) ────────────────────────────────────────────────────
 async function callGemini(apiKey, userPrompt) {
   let response;
@@ -201,13 +252,16 @@ async function handleGenerate(msg) {
 
   await chrome.storage.local.set({ lastRun: { status: "running" } });
 
-  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey"]);
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey"]);
   const provider = stored.aiProvider || "gemini";
 
   let rawText;
   if (provider === "gemini") {
     if (!stored.geminiApiKey) throw new Error("No Gemini API key saved. Enter it in the popup.");
     rawText = await callGemini(stored.geminiApiKey, buildPrompt(text, title));
+  } else if (provider === "nvidia") {
+    if (!stored.nvidiaApiKey) throw new Error("No NVIDIA API key saved. Enter it in the popup.");
+    rawText = await callNvidia(stored.nvidiaApiKey, buildPrompt(text, title));
   } else {
     if (!stored.groqApiKey) throw new Error("No Groq API key saved. Enter it in the popup.");
     rawText = await callGroq(stored.groqApiKey, buildPrompt(text, title));
