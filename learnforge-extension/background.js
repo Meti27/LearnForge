@@ -150,7 +150,6 @@ async function callNvidia(apiKey, userPrompt, model) {
       body: JSON.stringify({
         model: model || "deepseek-ai/deepseek-r1",
         messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userPrompt }],
-        response_format: { type: "json_object" },
         stream: true,
         temperature: 0.4,
         max_tokens: 8192,
@@ -268,7 +267,7 @@ async function handleGenerate(msg) {
   }
 
   // ── Parse + filter ────────────────────────────────────────────────────────
-  const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  const cleaned = rawText.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   let parsed;
   try { parsed = JSON.parse(cleaned); }
   catch (e) { throw new Error("Failed to parse AI response as JSON: " + e.message); }
