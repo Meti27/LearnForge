@@ -396,7 +396,7 @@ function setButtonState(s) {
 $mainBtn.addEventListener("click", async () => {
   if (state.status === "running") return;
 
-  const stored = await chrome.storage.local.get(["deckName", "aiProvider", "groqApiKey", "geminiApiKey"]);
+  const stored = await chrome.storage.local.get(["deckName", "aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey"]);
   const provider = stored.aiProvider || "gemini";
   const meta = PROVIDER_META[provider];
 
