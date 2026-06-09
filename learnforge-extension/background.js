@@ -141,14 +141,14 @@ async function callGroq(apiKey, userPrompt) {
 }
 
 // ── NVIDIA NIM (OpenAI-compatible streaming) ──────────────────────────────────
-async function callNvidia(apiKey, userPrompt) {
+async function callNvidia(apiKey, userPrompt, model) {
   let response;
   try {
     response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "deepseek-ai/deepseek-r1",
+        model: model || "deepseek-ai/deepseek-r1",
         messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userPrompt }],
         response_format: { type: "json_object" },
         stream: true,
@@ -252,7 +252,7 @@ async function handleGenerate(msg) {
 
   await chrome.storage.local.set({ lastRun: { status: "running" } });
 
-  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey"]);
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey", "nvidiaModel"]);
   const provider = stored.aiProvider || "gemini";
 
   let rawText;
@@ -261,7 +261,7 @@ async function handleGenerate(msg) {
     rawText = await callGemini(stored.geminiApiKey, buildPrompt(text, title));
   } else if (provider === "nvidia") {
     if (!stored.nvidiaApiKey) throw new Error("No NVIDIA API key saved. Enter it in the popup.");
-    rawText = await callNvidia(stored.nvidiaApiKey, buildPrompt(text, title));
+    rawText = await callNvidia(stored.nvidiaApiKey, buildPrompt(text, title), stored.nvidiaModel);
   } else {
     if (!stored.groqApiKey) throw new Error("No Groq API key saved. Enter it in the popup.");
     rawText = await callGroq(stored.groqApiKey, buildPrompt(text, title));

@@ -36,8 +36,11 @@ const $aiApiKey       = document.getElementById("aiApiKey");
 const $saveApiKey     = document.getElementById("saveApiKey");
 const $keyStatus      = document.getElementById("keyStatus");
 const $keyHelp        = document.getElementById("keyHelp");
-const $changeKeyBtn   = document.getElementById("changeKeyBtn");
-const $providerTabs   = document.getElementById("providerTabs");
+const $changeKeyBtn      = document.getElementById("changeKeyBtn");
+const $providerTabs      = document.getElementById("providerTabs");
+const $nvidiaModelRow    = document.getElementById("nvidiaModelRow");
+const $nvidiaModelInput  = document.getElementById("nvidiaModel");
+const $saveNvidiaModel   = document.getElementById("saveNvidiaModel");
 const $authLoggedOut  = document.getElementById("authLoggedOut");
 const $authLoggedIn   = document.getElementById("authLoggedIn");
 const $authEmail      = document.getElementById("authEmail");
@@ -120,6 +123,7 @@ function setProvider(provider) {
   const meta = PROVIDER_META[provider];
   $aiApiKey.placeholder = meta.placeholder;
   $keyHelp.innerHTML = meta.helpHtml;
+  $nvidiaModelRow.style.display = provider === "nvidia" ? "flex" : "none";
 }
 
 $providerTabs.addEventListener("click", async e => {
@@ -132,8 +136,9 @@ $providerTabs.addEventListener("click", async e => {
 });
 
 async function loadKeyStatus() {
-  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey"]);
+  const stored = await chrome.storage.local.get(["aiProvider", "groqApiKey", "geminiApiKey", "nvidiaApiKey", "nvidiaModel"]);
   const provider = stored.aiProvider || "gemini";
+  if (stored.nvidiaModel) $nvidiaModelInput.value = stored.nvidiaModel;
   setProvider(provider);
   const meta = PROVIDER_META[provider];
   const key = stored[meta.storageKey];
@@ -160,6 +165,13 @@ $saveApiKey.addEventListener("click", async () => {
   $keyStatus.className = "key-status saved";
   $changeKeyBtn.style.display = "block";
   log(`${meta.label} API key saved.`, "ok");
+});
+
+$saveNvidiaModel.addEventListener("click", async () => {
+  const model = $nvidiaModelInput.value.trim();
+  if (!model) return;
+  await chrome.storage.local.set({ nvidiaModel: model });
+  log(`NVIDIA model set to: ${model}`, "ok");
 });
 
 $changeKeyBtn.addEventListener("click", async () => {
