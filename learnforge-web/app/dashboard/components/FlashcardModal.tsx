@@ -18,13 +18,14 @@ const RATINGS: { label: string; value: Rating; cls: string }[] = [
 ];
 
 export default function FlashcardModal({ session, onClose }: Props) {
-  const [idx, setIdx]         = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [reviews, setReviews] = useState<CardReview[]>([...session.cards_reviewed]);
-  const [done, setDone]       = useState(false);
+  const [cards, setCards]      = useState(session.flashcards);
+  const [idx, setIdx]          = useState(0);
+  const [flipped, setFlipped]  = useState(false);
+  const [reviews, setReviews]  = useState<CardReview[]>([...session.cards_reviewed]);
+  const [done, setDone]        = useState(false);
 
-  const card = session.flashcards[idx];
-  const total = session.flashcards.length;
+  const card  = cards[idx];
+  const total = cards.length;
 
   async function rate(rating: Rating) {
     const review: CardReview = { cardIdx: idx, rating, at: Date.now() };
@@ -49,6 +50,23 @@ export default function FlashcardModal({ session, onClose }: Props) {
     }
   }
 
+  async function deleteCard() {
+    const newCards = cards.filter((_, i) => i !== idx);
+    setCards(newCards);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.from("sessions").update({ flashcards: newCards }).eq("id", session.id);
+    } catch {
+      // non-fatal
+    }
+    if (newCards.length === 0) {
+      setDone(true);
+    } else {
+      setIdx(i => Math.min(i, newCards.length - 1));
+      setFlipped(false);
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(reviews); }}>
       <div className="modal">
@@ -61,7 +79,7 @@ export default function FlashcardModal({ session, onClose }: Props) {
           {done ? (
             <div className="fc-done">
               <div className="fc-done-icon">🎉</div>
-              <div className="fc-done-text">All {total} cards reviewed!</div>
+              <div className="fc-done-text">All {session.flashcards.length} cards reviewed!</div>
               <button className="btn-submit" onClick={() => onClose(reviews)}>Close</button>
             </div>
           ) : (
@@ -81,6 +99,10 @@ export default function FlashcardModal({ session, onClose }: Props) {
                   <div className="fc-text">{card.back}</div>
                 </div>
               </div>
+
+              <button className="btn-remove-item" onClick={e => { e.stopPropagation(); deleteCard(); }}>
+                Remove this card
+              </button>
 
               {flipped && (
                 <div className="fc-ratings">

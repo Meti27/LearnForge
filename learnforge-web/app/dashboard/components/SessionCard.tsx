@@ -5,9 +5,10 @@ interface Props {
   session:    Session;
   onQuiz:     () => void;
   onFlashcard: () => void;
+  onDelete:   () => void;
 }
 
-export default function SessionCard({ session, onQuiz, onFlashcard }: Props) {
+export default function SessionCard({ session, onQuiz, onFlashcard, onDelete }: Props) {
   const quizDone     = session.quiz_results?.completed;
   const accuracy     = quizDone
     ? Math.round((session.quiz_results!.correct / session.quiz_results!.total) * 100)
@@ -18,7 +19,10 @@ export default function SessionCard({ session, onQuiz, onFlashcard }: Props) {
     <div className="session-card">
       <div className="session-card-top">
         <div className="session-domain">{session.domain}</div>
-        <div className="session-time">{formatRelativeTime(session.timestamp)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="session-time">{formatRelativeTime(session.timestamp)}</div>
+          <button className="btn-delete-session" onClick={onDelete} title="Delete session">✕</button>
+        </div>
       </div>
       <div className="session-title">{session.title}</div>
       <div className="session-meta">

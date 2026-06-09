@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Session, QuizResults, CardReview } from "@/lib/types";
 import SessionCard from "./SessionCard";
 import QuizModal from "./QuizModal";
@@ -43,6 +44,17 @@ export default function SessionList({ sessions: initialSessions, userId }: Props
     setModal(null);
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this session? This cannot be undone.")) return;
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.from("sessions").delete().eq("id", id);
+    } catch {
+      // best-effort
+    }
+    setSessions(prev => prev.filter(s => s.id !== id));
+  }
+
   if (sessions.length === 0) {
     return (
       <div className="sessions-empty">
@@ -75,6 +87,7 @@ export default function SessionList({ sessions: initialSessions, userId }: Props
               session={session}
               onQuiz={() => setModal({ type: "quiz", session })}
               onFlashcard={() => setModal({ type: "flashcard", session })}
+              onDelete={() => handleDelete(session.id)}
             />
           ))}
         </div>

@@ -36,6 +36,7 @@ const $aiApiKey       = document.getElementById("aiApiKey");
 const $saveApiKey     = document.getElementById("saveApiKey");
 const $keyStatus      = document.getElementById("keyStatus");
 const $keyHelp        = document.getElementById("keyHelp");
+const $changeKeyBtn   = document.getElementById("changeKeyBtn");
 const $providerTabs   = document.getElementById("providerTabs");
 const $authLoggedOut  = document.getElementById("authLoggedOut");
 const $authLoggedIn   = document.getElementById("authLoggedIn");
@@ -133,9 +134,11 @@ async function loadKeyStatus() {
     $keyStatus.textContent = `${meta.label} key saved ✓`;
     $keyStatus.className = "key-status saved";
     $aiApiKey.placeholder = meta.savedPlaceholder;
+    $changeKeyBtn.style.display = "block";
   } else {
     $keyStatus.textContent = "No API key saved";
     $keyStatus.className = "key-status missing";
+    $changeKeyBtn.style.display = "none";
   }
 }
 
@@ -148,7 +151,19 @@ $saveApiKey.addEventListener("click", async () => {
   $aiApiKey.placeholder = meta.savedPlaceholder;
   $keyStatus.textContent = `${meta.label} key saved ✓`;
   $keyStatus.className = "key-status saved";
+  $changeKeyBtn.style.display = "block";
   log(`${meta.label} API key saved.`, "ok");
+});
+
+$changeKeyBtn.addEventListener("click", async () => {
+  const meta = PROVIDER_META[activeProvider];
+  await chrome.storage.local.remove(meta.storageKey);
+  $aiApiKey.value = "";
+  $aiApiKey.placeholder = meta.placeholder;
+  $keyStatus.textContent = "No API key saved";
+  $keyStatus.className = "key-status missing";
+  $changeKeyBtn.style.display = "none";
+  $aiApiKey.focus();
 });
 
 // ── Auth state ────────────────────────────────────────────────────────────────
